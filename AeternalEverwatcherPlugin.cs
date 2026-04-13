@@ -44,14 +44,26 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     private static PlayMakerFSM controlFsm = null!;
     private static HealthManager healthManager = null!;
     private static Transform transform = null!;
+    private static bool jumpSlashAnticHappened;
     private static void SetupWatcher()
     {
-        healthManager.invincible = true;
+        controlFsm.GetFirstActionOfType<Wait>("Idle")!.time = 0;
+        controlFsm.GetFirstActionOfType<Wait>("Range Out Pause")!.time = 0;
+        controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 0;
+        controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.3f;
         controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = GetPosDiffSpeed() * -1);
         controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = GetPosDiffSpeed() * -1);
         controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = GetPosDiffSpeed());
-        controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = GetPosDiffSpeed() / -2);
         controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:true));
+        controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = GetPosDiffSpeed() * -0.5f);
+        controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.speed = GetPosDiffSpeed() * -0.75f);
+        controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<FloatMultiply>("Jump Slash Launch")!.multiplyBy = 9);
+        controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ => jumpSlashAnticHappened = true);
+        controlFsm.GetState("Jump Slash Air")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:jumpSlashAnticHappened));
+        controlFsm.GetState("Jump Slash New")!.AddLambdaMethod(_ => jumpSlashAnticHappened = false);
+        controlFsm.GetState("Slash Combo 13")!.AddLambdaMethod(_ => controlFsm.SetState("Range Check"));
+        controlFsm.GetState("Blocked Hit")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash New"));
+        controlFsm.GetState("Uppercut End")!.AddLambdaMethod(_ => controlFsm.SetState("Uppercut Launch"));
     }
 
     private static float GetPosDiffSpeed() => Mathf.Clamp(Math.Abs(HeroController.instance.transform.position.x - transform.position.x) * 30, 230, 270);
@@ -81,10 +93,14 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         "Slash Combo 7",
         "Slash Combo 9",
         "Slash Combo 10",
+        "F Slash 2",
+        "F Slash 3",
+        "F Slash 4",
     ];
 
     private void Update()
     {
         HeroController.instance.MaxHealth();
+        log(controlFsm.ActiveStateName);
     }
 }
