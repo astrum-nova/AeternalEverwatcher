@@ -36,6 +36,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                 controlFsm = fsm;
                 healthManager = fsm.GetComponent<HealthManager>();
                 transform = fsm.gameObject.transform;
+                foundWatcher = true;
                 break;
         }
 
@@ -44,6 +45,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     private static PlayMakerFSM controlFsm = null!;
     private static HealthManager healthManager = null!;
     private static Transform transform = null!;
+    private static bool foundWatcher;
     private static bool jumpSlashAnticHappened;
     private static void SetupWatcher()
     {
@@ -57,7 +59,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:true));
         controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = GetPosDiffSpeed() * -0.5f);
         controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.speed = GetPosDiffSpeed() * -0.75f);
-        controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<FloatMultiply>("Jump Slash Launch")!.multiplyBy = 9);
+        controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<FloatMultiply>("Jump Slash Launch")!.multiplyBy = 10);
         controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ => jumpSlashAnticHappened = true);
         controlFsm.GetState("Jump Slash Air")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:jumpSlashAnticHappened));
         controlFsm.GetState("Jump Slash New")!.AddLambdaMethod(_ => jumpSlashAnticHappened = false);
@@ -70,10 +72,10 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(HealthManager), nameof(HealthManager.Hit))]
-    private static void HealthManager_Hit(HealthManager __instance) => __instance.invincible = true;
+    private static void HealthManager_Hit(HealthManager __instance) => __instance.invincible = foundWatcher;
     [HarmonyPrefix]
     [HarmonyPatch(typeof(HealthManager), nameof(HealthManager.Invincible))]
-    private static void HealthManager_Hit(HealthManager __instance, HitInstance hitInstance)
+    private static void HealthManager_Invincible(HealthManager __instance, HitInstance hitInstance)
     {
         if (!parryableStates.Contains(controlFsm.ActiveStateName)) return;
         if (__instance.gameObject.transform.root.Find("Body Damager").TryGetComponent<DamageHero>(out var damager))
@@ -82,7 +84,26 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
         }
     }
-
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(DamageHero), nameof(DamageHero.NailClash))]
+    private static void DamageHero_NailClash(DamageHero __instance)
+    {
+        log(controlFsm.ActiveStateName);
+        if (controlFsm.ActiveStateName is "Uppercut 1" or "Uppercut 2" or "Uppercut 3" or "Dig Out Uppercut") HeroController.instance.StartInvulnerable(0.3f);
+        return;
+        if (__instance == null) return;
+        healthManager.TakeDamage(new HitInstance
+        {
+            Source = HeroController.instance.gameObject,
+            AttackType = AttackTypes.Nail,
+            DamageDealt = PlayerData.instance.nailDamage,
+            Direction = 270,
+            Multiplier = 1f,
+            MagnitudeMultiplier = 1f,
+            IgnoreInvulnerable = true,
+            IsNailTag = true
+        });
+    }
     private static readonly HashSet<string> parryableStates =
     [
         "Slash Combo 1",
@@ -96,11 +117,15 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         "F Slash 2",
         "F Slash 3",
         "F Slash 4",
+        "Uppercut 1",
+        "Uppercut 2",
+        "Uppercut 3",
+        "Dig Out Uppercut"
     ];
 
     private void Update()
     {
-        HeroController.instance.MaxHealth();
-        log(controlFsm.ActiveStateName);
+        //HeroController.instance.MaxHealth();
+        //log(controlFsm.ActiveStateName);
     }
 }
