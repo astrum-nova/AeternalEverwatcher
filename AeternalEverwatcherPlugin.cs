@@ -108,7 +108,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             }
         });
         controlFsm.GetState("Slash Combo 12")!.AddLambdaMethod(_ => { didSlashCombo1 = false; });
-        controlFsm.GetState("Jump Slash New")!.AddLambdaMethod(_ => { if (PHASE_2 && (didSlashCombo1 || didJumpSlashLaunch)) { Instance.StartCoroutine(SpawnSandWave(transform.localScale.x == 1, transform.localScale.x == -1)); } });
+        controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ => { if (PHASE_2 && (didSlashCombo1 || didJumpSlashLaunch)) { Instance.StartCoroutine(SpawnSandWave(transform.localScale.x == 1, transform.localScale.x == -1)); } });
     }
     private static IEnumerator jumpSlashMixup()
     {
@@ -142,6 +142,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     private static IEnumerator Teleport(float x, float y, string nextState)
     {
         //! i think it breaks because it has vertical speed as soon as it gets out
+        //! on second thought just mask the tp out and tp in with a sand wave and move him manually fuck it 
         controlFsm.SetState("Jump Away Launch");
         yield return new WaitForSeconds(0.1f);
         controlFsm.SetState("Dig In 1");
