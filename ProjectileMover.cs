@@ -13,6 +13,5 @@ public class ProjectileMover : MonoBehaviour
     private void Update()
     {
         transform.position += moveDirection * (Time.deltaTime * 100);
-        transform.localScale.Set(transform.localScale.x + 1, transform.localScale.y + 1, transform.localScale.z);
     }
 }
