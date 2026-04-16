@@ -30,6 +30,8 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
 
     private static bool PHASE_2 = true;
     private static bool PHASE_3 = true;
+    private static bool DAMAGE_RESET = false;
+    private static float SANDBURST_DEFAULT_Y = 6.552498f;
     private void Awake()
     {
         Instance = this;
@@ -51,6 +53,15 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                 foundWatcher = true;
                 break;
         }
+
+        HeroController.instance.OnTakenDamage += () =>
+        {
+            controlFsm.SetState("Dig In 1");
+            controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 1;
+            didSlashCombo1 = false;
+            didJumpSlashLaunch = false;
+            jumpSlashAnticHappened = false;
+        };
         SetupWatcher();
     }
     private static PlayMakerFSM controlFsm = null!;
@@ -62,11 +73,13 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     private static bool didJumpSlashLaunch;
     private static void SetupWatcher()
     {
+        controlFsm.GetFirstActionOfType<StartRoarEmitter>("Wake Roar 2")!.stunHero = false;
+        controlFsm.GetFirstActionOfType<Wait>("Wake Roar 2")!.time = 0.5f;
         controlFsm.GetFirstActionOfType<Wait>("Idle")!.time = 0;
         controlFsm.GetFirstActionOfType<Wait>("Range Out Pause")!.time = 0;
         controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 0;
-        controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.3f;
-        controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 70;
+        controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.5f;
+        controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 120;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Uppercut 1")!.speed = 70;
         controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = GetPosDiffSpeed() * -1);
         controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = GetPosDiffSpeed() * -1);
@@ -74,7 +87,12 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:true));
         controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = GetPosDiffSpeed() * -0.5f);
         controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.speed = GetPosDiffSpeed() * -0.75f);
-        controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ => { if (Random.Range(0, 2) == 0) Instance.StartCoroutine(jumpSlashMixup()); });
+        controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ =>
+        {
+            var num = Random.Range(0, 3);
+            if (num == 0) Instance.StartCoroutine(jumpSlashMixup()); 
+            else if (num == 1) Instance.StartCoroutine(SpawnGroundWave());
+        });
         controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<FloatMultiply>("Jump Slash Launch")!.multiplyBy = 8);
         controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ => jumpSlashAnticHappened = true);
         controlFsm.GetState("Jump Slash Air")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:jumpSlashAnticHappened));
@@ -87,28 +105,22 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(spawnSkProjectile()); });
         controlFsm.GetState("F Slash Recover")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(spawnSkProjectile()); });
         controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(SpawnSandWave()); });
-        controlFsm.GetState("Dig Out Uppercut")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(SpawnSandWave()); });
+        controlFsm.GetState("Dig Out Uppercut")!.AddLambdaMethod(_ =>
+        {
+            if (sandburst == null) Instance.StartCoroutine(SpawnSandWave());
+        });
         controlFsm.GetState("Slash Combo 1")!.AddLambdaMethod(_ => { if (PHASE_2) didSlashCombo1 = true; });
         controlFsm.GetState("Jump Slash Launch")!.AddLambdaMethod(_ => { if (PHASE_2) { didJumpSlashLaunch = true; } });
         controlFsm.GetState("Dash To Antic")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
-        controlFsm.GetState("Uppercut Antic")!.AddLambdaMethod(_ =>
-        {
-            if (didJumpSlashLaunch)
+        controlFsm.GetFirstActionOfType<FaceObjectV2>("Uppercut Antic")!.everyFrame = true;
+
+        controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ => {
+            if (PHASE_2 && (didSlashCombo1 || didJumpSlashLaunch))
             {
+                didSlashCombo1 = false;
                 didJumpSlashLaunch = false;
-                transform.FlipLocalScale(x:true);
-            }
-        });
-        controlFsm.GetState("Uppercut Antic Q")!.AddLambdaMethod(_ =>
-        {
-            if (didJumpSlashLaunch)
-            {
-                didJumpSlashLaunch = false;
-                transform.FlipLocalScale(x:true);
-            }
-        });
-        controlFsm.GetState("Slash Combo 12")!.AddLambdaMethod(_ => { didSlashCombo1 = false; });
-        controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ => { if (PHASE_2 && (didSlashCombo1 || didJumpSlashLaunch)) { Instance.StartCoroutine(SpawnSandWave(transform.localScale.x == 1, transform.localScale.x == -1)); } });
+                Instance.StartCoroutine(SpawnSandWave(transform.localScale.x == 1, transform.localScale.x == -1));
+            } });
     }
     private static IEnumerator jumpSlashMixup()
     {
@@ -155,21 +167,23 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     }
     private static IEnumerator SpawnGroundWave()
     {
+        var oldPos = transform.position;
         //! find something to give this attack to
-        controlFsm.SetState("Jump Away Antic");
-        yield return new WaitForSeconds(0.3f);
-        for (var i = 20; i > -20; i--)
+        controlFsm.SetState("Wake Roar 2");
+        yield return new WaitForSeconds(0.5f);
+        controlFsm.SetState("Dig In 1");
+        for (var i = 0; i < 20; i++)
         {
             yield return new WaitForSeconds(0.05f);
-            CreateWave(new Vector3(HeroController.instance.transform.position.x + i * 4, sandburst.transform.position.y - 10, sandburst.transform.position.z));
+            CreateWave(new Vector3(oldPos.x + i * 4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z));
+            CreateWave(new Vector3(oldPos.x + i * -4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z));
         }
-        controlFsm.SetState("Range Check");
     }
-
     private static void CreateWave(Vector3 position)
     {
         var wave = Instantiate(sandburst);
         wave.transform.position = position;
+        wave.transform.SetRotation2D(Random.Range(-5, 5));
         wave.SetActive(false);
         wave.SetActive(true);
     }
@@ -181,20 +195,20 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         else if (left && right)
         {
             var left1 = Instantiate(sandburst);
-            left1.transform.position = new Vector3(sandburst.transform.position.x - 5, sandburst.transform.position.y, sandburst.transform.position.z);
+            left1.transform.position = new Vector3(sandburst.transform.position.x - 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             left1.SetActive(false);
             left1.SetActive(true);
             var right1 = Instantiate(sandburst);
-            right1.transform.position = new Vector3(sandburst.transform.position.x + 5, sandburst.transform.position.y, sandburst.transform.position.z);
+            right1.transform.position = new Vector3(sandburst.transform.position.x + 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             right1.SetActive(false);
             right1.SetActive(true);
             yield return new WaitForSeconds(0.2f);
             var left2 = Instantiate(sandburst);
-            left2.transform.position = new Vector3(sandburst.transform.position.x - 10, sandburst.transform.position.y, sandburst.transform.position.z);
+            left2.transform.position = new Vector3(sandburst.transform.position.x - 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             left2.SetActive(false);
             left2.SetActive(true);
             var right2 = Instantiate(sandburst);
-            right2.transform.position = new Vector3(sandburst.transform.position.x + 10, sandburst.transform.position.y, sandburst.transform.position.z);
+            right2.transform.position = new Vector3(sandburst.transform.position.x + 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             right2.SetActive(false);
             right2.SetActive(true);
             yield return new WaitForSeconds(1);
@@ -205,17 +219,17 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         } else if (left)
         {
             var left1 = Instantiate(sandburst);
-            left1.transform.position = new Vector3(transform.position.x - 5, sandburst.transform.position.y, sandburst.transform.position.z);
+            left1.transform.position = new Vector3(transform.position.x - 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             left1.SetActive(false);
             left1.SetActive(true);
             yield return new WaitForSeconds(0.2f);
             var left2 = Instantiate(sandburst);
-            left2.transform.position = new Vector3(transform.position.x - 10, sandburst.transform.position.y, sandburst.transform.position.z);
+            left2.transform.position = new Vector3(transform.position.x - 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             left2.SetActive(false);
             left2.SetActive(true);
             yield return new WaitForSeconds(0.2f);
             var left3 = Instantiate(sandburst);
-            left3.transform.position = new Vector3(transform.position.x - 15, sandburst.transform.position.y, sandburst.transform.position.z);
+            left3.transform.position = new Vector3(transform.position.x - 15, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             left3.SetActive(false);
             left3.SetActive(true);
             yield return new WaitForSeconds(1);
@@ -225,17 +239,17 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         } else if (right)
         {
             var right1 = Instantiate(sandburst);
-            right1.transform.position = new Vector3(transform.position.x + 5, sandburst.transform.position.y, sandburst.transform.position.z);
+            right1.transform.position = new Vector3(transform.position.x + 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             right1.SetActive(false);
             right1.SetActive(true);
             yield return new WaitForSeconds(0.2f);
             var right2 = Instantiate(sandburst);
-            right2.transform.position = new Vector3(transform.position.x + 10, sandburst.transform.position.y, sandburst.transform.position.z);
+            right2.transform.position = new Vector3(transform.position.x + 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             right2.SetActive(false);
             right2.SetActive(true);
             yield return new WaitForSeconds(0.2f);
             var right3 = Instantiate(sandburst);
-            right3.transform.position = new Vector3(transform.position.x + 15, sandburst.transform.position.y, sandburst.transform.position.z);
+            right3.transform.position = new Vector3(transform.position.x + 15, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
             right3.SetActive(false);
             right3.SetActive(true);
             yield return new WaitForSeconds(1);
@@ -273,8 +287,8 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             var s = fsm.GetState(stateName);
             if (s != null)
             {
-                s.Transitions = Array.Empty<FsmTransition>();
-                s.Actions = Array.Empty<FsmStateAction>();
+                s.Transitions = [];
+                s.Actions = [];
             }
         }
     }
