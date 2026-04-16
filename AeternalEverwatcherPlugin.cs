@@ -61,6 +61,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             didSlashCombo1 = false;
             didJumpSlashLaunch = false;
             jumpSlashAnticHappened = false;
+            fiveSLash = false;
         };
         SetupWatcher();
     }
@@ -71,6 +72,8 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     private static bool jumpSlashAnticHappened;
     private static bool didSlashCombo1;
     private static bool didJumpSlashLaunch;
+    private static bool fiveSLash;
+    private static bool fiveSLashedOnce;
     private static void SetupWatcher()
     {
         controlFsm.GetFirstActionOfType<StartRoarEmitter>("Wake Roar 2")!.stunHero = false;
@@ -81,11 +84,16 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.5f;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 120;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Uppercut 1")!.speed = 70;
-        controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = GetPosDiffSpeed() * -1);
-        controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = GetPosDiffSpeed() * -1);
+        controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash && !fiveSLashedOnce ? 0 : GetPosDiffSpeed() * -1);
+        controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash && !fiveSLashedOnce ? 0 : GetPosDiffSpeed() * -1);
         controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = GetPosDiffSpeed());
         controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:true));
         controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = GetPosDiffSpeed() * -0.5f);
+        controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ =>
+        {
+            fiveSLashedOnce = false;
+            Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x, transform.position.x, "Slash Combo Antic Q"));
+        });
         controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.speed = GetPosDiffSpeed() * -0.75f);
         controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ =>
         {
@@ -113,14 +121,22 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetState("Jump Slash Launch")!.AddLambdaMethod(_ => { if (PHASE_2) { didJumpSlashLaunch = true; } });
         controlFsm.GetState("Dash To Antic")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
         controlFsm.GetFirstActionOfType<FaceObjectV2>("Uppercut Antic")!.everyFrame = true;
-
         controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ => {
             if (PHASE_2 && (didSlashCombo1 || didJumpSlashLaunch))
             {
                 didSlashCombo1 = false;
                 didJumpSlashLaunch = false;
+                fiveSLash = false;
                 Instance.StartCoroutine(SpawnSandWave(transform.localScale.x == 1, transform.localScale.x == -1));
             } });
+        controlFsm.GetState("Uppercut Antic")!.AddLambdaMethod(_ =>
+        {
+            if (Random.Range(0, 2) == 0)
+            {
+                fiveSLash = true;
+                controlFsm.SetState("Slash Combo Antic Q");
+            }
+        });
     }
     private static IEnumerator jumpSlashMixup()
     {
@@ -153,16 +169,10 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
 
     private static IEnumerator Teleport(float x, float y, string nextState)
     {
-        //! i think it breaks because it has vertical speed as soon as it gets out
-        //! on second thought just mask the tp out and tp in with a sand wave and move him manually fuck it 
-        controlFsm.SetState("Jump Away Launch");
-        yield return new WaitForSeconds(0.1f);
-        controlFsm.SetState("Dig In 1");
-        controlFsm.GetFirstActionOfType<SetPosition>("Dig Pos")!.x = x;
-        controlFsm.GetFirstActionOfType<SetPosition>("Dig Pos")!.y = y;
-        yield return new WaitForSeconds(0.2f);
-        controlFsm.SetState("Dig Out 1");
-        yield return new WaitForSeconds(0.2f);
+        Instance.StartCoroutine(CreateWave(new Vector3(transform.position.x, transform.position.y, sandburst.transform.position.z)));
+        yield return new WaitForSeconds(0.05f);
+        transform.position = new Vector3(x, y, transform.position.z);
+        Instance.StartCoroutine(CreateWave(new Vector3(transform.position.x, transform.position.y, sandburst.transform.position.z)));
         controlFsm.SetState(nextState);
     }
     private static IEnumerator SpawnGroundWave()
@@ -175,17 +185,19 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         for (var i = 0; i < 20; i++)
         {
             yield return new WaitForSeconds(0.05f);
-            CreateWave(new Vector3(oldPos.x + i * 4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z));
-            CreateWave(new Vector3(oldPos.x + i * -4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z));
+            Instance.StartCoroutine(CreateWave(new Vector3(oldPos.x + i * 4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z)));
+            Instance.StartCoroutine(CreateWave(new Vector3(oldPos.x + i * -4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z)));
         }
     }
-    private static void CreateWave(Vector3 position)
+    private static IEnumerator CreateWave(Vector3 position)
     {
         var wave = Instantiate(sandburst);
         wave.transform.position = position;
         wave.transform.SetRotation2D(Random.Range(-5, 5));
         wave.SetActive(false);
         wave.SetActive(true);
+        yield return new WaitForSeconds(1);
+        Destroy(wave);
     }
     private static GameObject sandburst;
     private static IEnumerator SpawnSandWave(bool left = true, bool right = true)
