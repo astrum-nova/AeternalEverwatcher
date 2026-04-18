@@ -1,14 +1,11 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using BepInEx;
 using BepInEx.Logging;
 using GlobalEnums;
-using GlobalSettings;
 using HarmonyLib;
-using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
 using Silksong.AssetHelper.ManagedAssets;
 using Silksong.FsmUtil;
@@ -30,8 +27,9 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
 
     private static bool PHASE_2 = true;
     private static bool PHASE_3 = true;
-    private static bool DAMAGE_RESET = false;
-    private static float SANDBURST_DEFAULT_Y = 6.552498f;
+    private const float SANDBURST_DEFAULT_Y = 6.552498f;
+    private const float WATCHER_GROUND_Y = 8.3275f;
+
     private void Awake()
     {
         Instance = this;
@@ -53,21 +51,37 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                 foundWatcher = true;
                 break;
         }
-
         HeroController.instance.OnTakenDamage += () =>
         {
-            controlFsm.SetState("Dig In 1");
-            controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 1;
-            didSlashCombo1 = false;
-            didJumpSlashLaunch = false;
-            jumpSlashAnticHappened = false;
-            fiveSLash = false;
+            if (!undergroundStates.Contains(controlFsm.ActiveStateName)) controlFsm.SetState("Dig In 1");
+            ResetFlags();
         };
         SetupWatcher();
     }
+
+    private static readonly HashSet<string> undergroundStates =
+    [
+        "Dig In 1",
+        "Dig In 2",
+        "Away",
+        "Hiding",
+        "Emerge Pause",
+        "Dig Pos",
+        "Dig Out Antic",
+        "Dig Out 1"
+    ];
+
+    private static void ResetFlags()
+    {
+        didSlashCombo1 = false;
+        didJumpSlashLaunch = false;
+        jumpSlashAnticHappened = false;
+        fiveSLash = false;
+        fiveSLashedOnce = false;
+    }
     private static PlayMakerFSM controlFsm = null!;
     private static HealthManager healthManager = null!;
-    private static Transform transform = null!;
+    private new static Transform transform = null!;
     private static bool foundWatcher;
     private static bool jumpSlashAnticHappened;
     private static bool didSlashCombo1;
@@ -76,23 +90,42 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     private static bool fiveSLashedOnce;
     private static void SetupWatcher()
     {
+        controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.3f;
         controlFsm.GetFirstActionOfType<StartRoarEmitter>("Wake Roar 2")!.stunHero = false;
         controlFsm.GetFirstActionOfType<Wait>("Wake Roar 2")!.time = 0.5f;
         controlFsm.GetFirstActionOfType<Wait>("Idle")!.time = 0;
         controlFsm.GetFirstActionOfType<Wait>("Range Out Pause")!.time = 0;
         controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 0;
-        controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.5f;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 120;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Uppercut 1")!.speed = 70;
-        controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash && !fiveSLashedOnce ? 0 : GetPosDiffSpeed() * -1);
-        controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash && !fiveSLashedOnce ? 0 : GetPosDiffSpeed() * -1);
-        controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = GetPosDiffSpeed());
-        controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:true));
+        controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ =>
+        {
+            Instance.StartCoroutine(FinishStateEarly("FINISHED", 0.55f));
+            controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : GetPosDiffSpeed() * -1;
+        });
+        controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ =>
+        {
+            Instance.StartCoroutine(FinishStateEarly("FINISHED", 0.45f));
+            controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : GetPosDiffSpeed() * -1;
+        });
+        controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = GetPosDiffSpeed() * (fiveSLash ? -1 : 1));
+        controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:!fiveSLash));
         controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = GetPosDiffSpeed() * -0.5f);
         controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ =>
         {
-            fiveSLashedOnce = false;
-            Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x, transform.position.x, "Slash Combo Antic Q"));
+            if (fiveSLash)
+            {
+                if (!fiveSLashedOnce)
+                {
+                    Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + 3.5f * transform.localScale.x * -1, transform.position.y, "Slash Combo Antic Q"));
+                    fiveSLashedOnce = true;
+                }
+                else
+                {
+                    Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + 5f * transform.localScale.x, transform.position.y, "Slash Combo 8"));
+                    fiveSLashedOnce = false;
+                }
+            }
         });
         controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.speed = GetPosDiffSpeed() * -0.75f);
         controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ =>
@@ -109,49 +142,138 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetState("Blocked Hit")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash New"));
         controlFsm.GetState("Uppercut End")!.AddLambdaMethod(_ => controlFsm.SetState("Uppercut Launch"));
         controlFsm.GetState("Dash To Jump")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
+        controlFsm.GetState("Very Far")!.AddLambdaMethod(_ => Instance.StartCoroutine(SpawnGroundWave()));
         controlFsm.GetState("Slash Combo 3")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(spawnSkProjectile()); });
         controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(spawnSkProjectile()); });
         controlFsm.GetState("F Slash Recover")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(spawnSkProjectile()); });
-        controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(SpawnSandWave()); });
+        controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ =>
+        {
+            if (!sandburst)
+            {
+                var sandburstOriginal = GameObject.Find("sand_burst_effect_uppercut");
+                SandColorSetup(sandburstOriginal);
+                sandburst = Instantiate(sandburstOriginal);
+                sandburst.SetActive(false);
+                SandSpeedSetup(sandburst, 3);
+                groundWave = Instantiate(sandburst);
+                groundWave.SetActive(false);
+                SandColorSetup(groundWave);
+                SandSpeedSetup(groundWave);
+                var damagerHitboxOriginal = groundWave.transform.FindRelativeTransformWithPath("damager", false).GetComponent<PolygonCollider2D>();
+                Vector2[] points = [ new(-10, 3), new(10, 3), new(-10, 0), new(10, 0) ];
+                damagerHitboxOriginal.SetPath(0, points);
+                foreach (var pt in groundWave.GetComponentsInChildren<ParticleSystem>(true))
+                {
+                    // for some FUCKASS reason i need to get a ref to the shape before changing its scale wtff???
+                    var shape = pt.shape;
+                    shape.scale = new Vector3(6, 0.1f, 1);
+                    var emission = pt.emission;
+                    var bursts = new ParticleSystem.Burst[emission.burstCount];
+                    emission.GetBursts(bursts);
+                    for (var i = 0; i < bursts.Length; i++)
+                    {
+                        bursts[i].minCount *= 20;
+                        bursts[i].maxCount *= 20;
+                    }
+                    emission.SetBursts(bursts);
+                    var main = pt.main;
+                    main.maxParticles = 1000;
+                }
+            }
+            if (PHASE_2) Instance.StartCoroutine(SpawnSandWave());
+        });
         controlFsm.GetState("Dig Out Uppercut")!.AddLambdaMethod(_ =>
         {
             if (sandburst == null) Instance.StartCoroutine(SpawnSandWave());
         });
-        controlFsm.GetState("Slash Combo 1")!.AddLambdaMethod(_ => { if (PHASE_2) didSlashCombo1 = true; });
+        controlFsm.GetState("Slash Combo 1")!.AddLambdaMethod(_ => { if (PHASE_2 && !fiveSLash) didSlashCombo1 = true; });
         controlFsm.GetState("Jump Slash Launch")!.AddLambdaMethod(_ => { if (PHASE_2) { didJumpSlashLaunch = true; } });
         controlFsm.GetState("Dash To Antic")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
         controlFsm.GetFirstActionOfType<FaceObjectV2>("Uppercut Antic")!.everyFrame = true;
-        controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ => {
+        controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ =>
+        {
+            if (sandburstSmall == null)
+            {
+                sandburstSmall = transform.Find("Pt SwordSlam").gameObject;
+                SandColorSetup(sandburstSmall);
+            }
             if (PHASE_2 && (didSlashCombo1 || didJumpSlashLaunch))
             {
-                didSlashCombo1 = false;
-                didJumpSlashLaunch = false;
-                fiveSLash = false;
                 Instance.StartCoroutine(SpawnSandWave(transform.localScale.x == 1, transform.localScale.x == -1));
-            } });
+            }
+            ResetFlags();
+        });
         controlFsm.GetState("Uppercut Antic")!.AddLambdaMethod(_ =>
         {
-            if (Random.Range(0, 2) == 0)
+            if (Random.Range(0, 3) == 0)
             {
                 fiveSLash = true;
+                fiveSLashedOnce = false;
                 controlFsm.SetState("Slash Combo Antic Q");
             }
         });
     }
+    private static void SandColorSetup(GameObject wave)
+    {
+        foreach (var pt in wave.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            if (pt.name is "sand_blown" or "particles_small") continue;
+            var main = pt.main;
+            main.startColor = new ParticleSystem.MinMaxGradient(Color.white);
+            var renderer = pt.GetComponent<ParticleSystemRenderer>();
+            if (renderer && renderer.material)
+            {
+                renderer.material.color = Color.white;
+                renderer.material.SetColor(Color1, new Color(2.5f, 2.5f, 2.5f, 1f));
+            }
+        }
+    }
+    private static void SandSpeedSetup(GameObject wave, float velLimit = 2.0f)
+    {
+        foreach (var pt in wave.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var limitVelocity = pt.limitVelocityOverLifetime;
+            limitVelocity.enabled = true;
+            limitVelocity.limit = velLimit;
+            limitVelocity.dampen = 0.5f;
+        }
+    }
+    private static IEnumerator FinishStateEarly(string eventName, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        controlFsm.SendEvent(eventName);
+    }
     private static IEnumerator jumpSlashMixup()
     {
+        //TODO: experiment with shortening the delay, right now hes telegraphing an F slash and randomly switching to this
+        // which is a bit confusing
         yield return new WaitForSeconds(0.2f);
         controlFsm.SetState("Jump Slash Antic");
     }
+    private static GameObject skProjectileSetup = null!;
     private static IEnumerator spawnSkProjectile()
     {
-        yield return skProjectile.Load();
-        var instance = skProjectile.InstantiateAsset();
+        if (fiveSLash) yield break;
+        if (!skProjectileSetup)
+        {
+            yield return skProjectile.Load();
+            skProjectileSetup = skProjectile.InstantiateAsset();
+            skProjectileSetup.GetComponent<Collider2D>().isTrigger = true;
+            MakeProjectileIgnoreEnvironment(skProjectileSetup);
+            RemoveProjectileWallEvents(skProjectileSetup);
+            skProjectileSetup.AddComponent<ProjectileMover>();
+            skProjectileSetup.SetActive(false);
+            skProjectileSetup.transform.position = new Vector3(0, 500, 0);
+        }
+        var instance = Instantiate(skProjectileSetup);
+        instance.SetActive(true);
+        SetProjetilePosition(instance);
+        yield return new WaitForSeconds(1);
+        Destroy(instance);
+    }
+    private static void SetProjetilePosition(GameObject instance)
+    {
         instance.transform.position = transform.position;
-        instance.GetComponent<Collider2D>().isTrigger = true;
-        MakeProjectileIgnoreEnvironment(instance);
-        RemoveProjectileWallEvents(instance);
-        instance.AddComponent<ProjectileMover>();
         instance.transform.SetPositionAndRotation(new Vector3(
             HeroController.instance.transform.position.x + (ObjLeftOfHornet(instance) ? 15 : -15),
             transform.position.y - 1,
@@ -159,115 +281,75 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         ), !ObjLeftOfHornet(instance) ? Quaternion.Euler(0, 180, 0) : Quaternion.Euler(0, 0, 0));
         instance.transform.localScale = new Vector3(1.75f, Random.Range(1.8f, 2.2f), 1);
         instance.transform.SetLocalRotation2D(Random.Range(-10, 10));
-        var left1 = Instantiate(sandburst);
-        left1.transform.position = new Vector3(HeroController.instance.transform.position.x + (ObjLeftOfHornet(instance) ? -13 : 13), sandburst.transform.position.y, sandburst.transform.position.z);
-        left1.SetActive(false);
-        left1.SetActive(true);
-        yield return new WaitForSeconds(1);
-        Destroy(left1);
+        /*Instance.StartCoroutine(CreateWave(new Vector3(
+            HeroController.instance.transform.position.x + (ObjLeftOfHornet(instance) ? -13 : 13),
+            sandburst.transform.position.y,
+            sandburst.transform.position.z)));*/
     }
-
-    private static IEnumerator Teleport(float x, float y, string nextState)
+    private static IEnumerator Teleport(float x, float y, string? nextState = null, bool flipX = false)
     {
-        Instance.StartCoroutine(CreateWave(new Vector3(transform.position.x, transform.position.y, sandburst.transform.position.z)));
+        var waveOld = CreateWave(sandburstSmall, new Vector3(transform.position.x, transform.position.y - 1.5f, sandburst.transform.position.z));
         yield return new WaitForSeconds(0.05f);
         transform.position = new Vector3(x, y, transform.position.z);
-        Instance.StartCoroutine(CreateWave(new Vector3(transform.position.x, transform.position.y, sandburst.transform.position.z)));
-        controlFsm.SetState(nextState);
+        var waveNew = CreateWave(sandburstSmall, new Vector3(transform.position.x, transform.position.y - 1.5f, sandburst.transform.position.z));
+        controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = 0;
+        if (nextState != null) controlFsm.SetState(nextState);
+        if (flipX) transform.FlipLocalScale(x:true);
+        yield return new WaitForSeconds(1f);
+        Destroy(waveOld);
+        Destroy(waveNew);
     }
     private static IEnumerator SpawnGroundWave()
     {
-        var oldPos = transform.position;
-        //! find something to give this attack to
+        ResetFlags();
         controlFsm.SetState("Wake Roar 2");
         yield return new WaitForSeconds(0.5f);
         controlFsm.SetState("Dig In 1");
-        for (var i = 0; i < 20; i++)
-        {
-            yield return new WaitForSeconds(0.05f);
-            Instance.StartCoroutine(CreateWave(new Vector3(oldPos.x + i * 4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z)));
-            Instance.StartCoroutine(CreateWave(new Vector3(oldPos.x + i * -4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z)));
-        }
+        CreateWave(groundWave, new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation:false);
     }
-    private static IEnumerator CreateWave(Vector3 position)
+    private static GameObject CreateWave(GameObject go, Vector3 position, float delayToDestruction = 1, bool rotation = true)
     {
-        var wave = Instantiate(sandburst);
+        var wave = Instantiate(go);
         wave.transform.position = position;
-        wave.transform.SetRotation2D(Random.Range(-5, 5));
+        if (rotation) wave.transform.SetRotation2D(Random.Range(-5, 5));
         wave.SetActive(false);
         wave.SetActive(true);
-        yield return new WaitForSeconds(1);
-        Destroy(wave);
+        Instance.StartCoroutine(DestroyLater(wave, delayToDestruction));
+        return wave;
     }
-    private static GameObject sandburst;
+    private static IEnumerator DestroyLater(GameObject go, float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        Destroy(go);
+    }
+    private static GameObject groundWave = null!;
+    private static GameObject sandburst = null!;
+    private static GameObject sandburstSmall = null!;
     private static IEnumerator SpawnSandWave(bool left = true, bool right = true)
     {
+        var originObject = transform.FindRelativeTransformWithPath("sand_burst_effect_uppercut_origin", false)!;
         yield return new WaitForSeconds(0.2f);
-        if (sandburst == null) sandburst = transform.Find("sand_burst_effect_uppercut").gameObject;
-        else if (left && right)
+        if (left && right)
         {
-            var left1 = Instantiate(sandburst);
-            left1.transform.position = new Vector3(sandburst.transform.position.x - 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left1.SetActive(false);
-            left1.SetActive(true);
-            var right1 = Instantiate(sandburst);
-            right1.transform.position = new Vector3(sandburst.transform.position.x + 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right1.SetActive(false);
-            right1.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var left2 = Instantiate(sandburst);
-            left2.transform.position = new Vector3(sandburst.transform.position.x - 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left2.SetActive(false);
-            left2.SetActive(true);
-            var right2 = Instantiate(sandburst);
-            right2.transform.position = new Vector3(sandburst.transform.position.x + 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right2.SetActive(false);
-            right2.SetActive(true);
-            yield return new WaitForSeconds(1);
-            Destroy(left1);
-            Destroy(left2);
-            Destroy(right1);
-            Destroy(right2);
+            CreateWave(sandburst, new Vector3(originObject.position.x + 6 * transform.localScale.x * -1, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+            yield return new WaitForSeconds(0.1f);
+            CreateWave(sandburst, new Vector3(originObject.position.x + 10 * transform.localScale.x * -1, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+            yield return new WaitForSeconds(0.1f);
+            CreateWave(sandburst, new Vector3(originObject.position.x + 14 * transform.localScale.x * -1, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
         } else if (left)
         {
-            var left1 = Instantiate(sandburst);
-            left1.transform.position = new Vector3(transform.position.x - 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left1.SetActive(false);
-            left1.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var left2 = Instantiate(sandburst);
-            left2.transform.position = new Vector3(transform.position.x - 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left2.SetActive(false);
-            left2.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var left3 = Instantiate(sandburst);
-            left3.transform.position = new Vector3(transform.position.x - 15, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left3.SetActive(false);
-            left3.SetActive(true);
-            yield return new WaitForSeconds(1);
-            Destroy(left1);
-            Destroy(left2);
-            Destroy(left3);
+            CreateWave(sandburst, new Vector3(transform.position.x - 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+            yield return new WaitForSeconds(0.1f);
+            CreateWave(sandburst, new Vector3(transform.position.x - 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+            yield return new WaitForSeconds(0.1f);
+            CreateWave(sandburst, new Vector3(transform.position.x - 15, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
         } else if (right)
         {
-            var right1 = Instantiate(sandburst);
-            right1.transform.position = new Vector3(transform.position.x + 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right1.SetActive(false);
-            right1.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var right2 = Instantiate(sandburst);
-            right2.transform.position = new Vector3(transform.position.x + 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right2.SetActive(false);
-            right2.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var right3 = Instantiate(sandburst);
-            right3.transform.position = new Vector3(transform.position.x + 15, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right3.SetActive(false);
-            right3.SetActive(true);
-            yield return new WaitForSeconds(1);
-            Destroy(right1);
-            Destroy(right2);
-            Destroy(right3);
+            CreateWave(sandburst, new Vector3(transform.position.x + 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+            yield return new WaitForSeconds(0.1f);
+            CreateWave(sandburst, new Vector3(transform.position.x + 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+            yield return new WaitForSeconds(0.1f);
+            CreateWave(sandburst, new Vector3(transform.position.x + 15, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
         }
     }
 
@@ -324,7 +406,6 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     [HarmonyPatch(typeof(DamageHero), nameof(DamageHero.NailClash))]
     private static void DamageHero_NailClash(DamageHero __instance)
     {
-        log(controlFsm.ActiveStateName);
         if (iframeStates.Contains(controlFsm.ActiveStateName)) HeroController.instance.StartInvulnerable(0.3f);
         if (!GameManager.instance.TimeSlowed) GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
         
@@ -373,12 +454,13 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         "Dig Out Uppercut"
     ];
 
+    private static readonly int Color1 = Shader.PropertyToID("_Color");
+
     private void Update()
     {
         try
         {
             HeroController.instance.MaxHealth();
         } catch {/*ignored*/}
-        //log(controlFsm.ActiveStateName);
     }
 }
