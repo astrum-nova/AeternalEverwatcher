@@ -13,6 +13,7 @@ public static class CustomBehaviour
     public static ManagedAsset<GameObject> skProjectile = null!;
     private static GameObject skProjectileSetup = null!;
     public static GameObject groundWave = null!;
+    public static GameObject pcrBurst = null!;
     public static GameObject sandburst = null!;
     public static GameObject sandburstSmall = null!;
 
@@ -116,10 +117,51 @@ public static class CustomBehaviour
             pos2 = AeternalEverwatcherPlugin.transform.position.x + 10;
             pos3 = AeternalEverwatcherPlugin.transform.position.x + 15;
         }
-        CreateWave(sandburst, new Vector3(pos1, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
-        yield return new WaitForSeconds(0.1f);
-        CreateWave(sandburst, new Vector3(pos2, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
-        yield return new WaitForSeconds(0.1f);
-        CreateWave(sandburst, new Vector3(pos3, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+
+        if (!pcrSlamsEndWave)
+        {
+            CreateWave(sandburst, new Vector3(pos1, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+            yield return new WaitForSeconds(0.1f);
+            CreateWave(sandburst, new Vector3(pos2, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+            yield return new WaitForSeconds(0.1f);
+            CreateWave(sandburst, new Vector3(pos3, SANDBURST_DEFAULT_Y, sandburst.transform.position.z));
+        }
+        else
+        {
+            var burst = CreateWave(pcrBurst, new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation: false);
+            Helpers.SandSpeedSetup(burst, velLimit:10);
+            pcrSlamsEndWave = false;
+        }
+    }
+
+    private static bool pcrSlamsEndWave;
+    public static IEnumerator PCRSlams()
+    {
+        AeternalEverwatcherPlugin.pcrSlamming = true;
+        yield return new WaitForSeconds(0.8f);
+        AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + (Random.Range(0, 2) == 0 ? -7 : 7), HeroController.instance.transform.position.y + 7, "Uppercut End"));
+        AeternalEverwatcherPlugin.transform.localScale.Set(Helpers.ObjLeftOfHornet(AeternalEverwatcherPlugin.transform.gameObject) ? -1 : 1, 1, 1);
+        yield return new WaitForSeconds(0.7f);
+        AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + (Random.Range(0, 2) == 0 ? -7 : 7), HeroController.instance.transform.position.y + 7, "Uppercut End"));
+        AeternalEverwatcherPlugin.transform.localScale.Set(Helpers.ObjLeftOfHornet(AeternalEverwatcherPlugin.transform.gameObject) ? -1 : 1, 1, 1);
+        yield return new WaitForSeconds(0.7f);
+        AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + (Random.Range(0, 2) == 0 ? -7 : 7), HeroController.instance.transform.position.y + 7, "Uppercut End"));
+        AeternalEverwatcherPlugin.transform.localScale.Set(Helpers.ObjLeftOfHornet(AeternalEverwatcherPlugin.transform.gameObject) ? -1 : 1, 1, 1);
+        yield return new WaitForSeconds(0.7f);
+        pcrSlamsEndWave = true;
+        AeternalEverwatcherPlugin.controlFsm.SetState("Uppercut Antic Q");
+        yield return new WaitForSeconds(0.65f);
+        AeternalEverwatcherPlugin.controlFsm.SetState("Jump Away Launch");
+        AeternalEverwatcherPlugin.pcrSlamming = false;
+    }
+    
+    public static IEnumerator EigongAirDashes()
+    {
+        yield return null;
+    }
+    
+    public static IEnumerator QuadWindSlash()
+    {
+        yield return null;
     }
 }

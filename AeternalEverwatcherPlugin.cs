@@ -31,35 +31,35 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     private static bool didJumpSlashLaunch;
     public static bool fiveSLash;
     private static bool fiveSLashedOnce;
+    public static bool pcrSlamming;
 
     private void Awake()
     {
         Instance = this;
         Logger.LogInfo($"Plugin {Name} ({Id}) has loaded!");
         Harmony.CreateAndPatchAll(typeof(PatchesLikeFromEldenRing));
-        SceneManager.sceneLoaded += SceneLoadSetup;
-        CustomBehaviour.skProjectile = ManagedAsset<GameObject>.FromNonSceneAsset("Assets/Prefabs/Hornet Enemies/Song Knight Projectile.prefab", "localpoolprefabs_assets_areahangareasong");
-    }
-    private static void SceneLoadSetup(Scene scene, LoadSceneMode mode)
-    {
-        if (!scene.name.Equals("Coral_39")) return;
-        foreach (var fsm in FindObjectsByType<PlayMakerFSM>(FindObjectsSortMode.None)!.Where(fsm => fsm.name.Equals("Coral Warrior Grey"))) switch (fsm.FsmName)
+        SceneManager.sceneLoaded += (scene, _) =>
         {
-            case "Stun Control": Destroy(fsm); break;
-            case "Control":
-                controlFsm = fsm;
-                healthManager = fsm.GetComponent<HealthManager>();
-                transform = fsm.gameObject.transform;
-                foundWatcher = true;
-                break;
-        }
-        HeroController.instance.OnTakenDamage += () =>
-        {
-            if (!StateData.undergroundStates.Contains(controlFsm.ActiveStateName)) controlFsm.SetState("Dig In 1");
+            if (!scene.name.Equals("Coral_39")) return;
+            foreach (var fsm in FindObjectsByType<PlayMakerFSM>(FindObjectsSortMode.None)!.Where(fsm => fsm.name.Equals("Coral Warrior Grey"))) switch (fsm.FsmName)
+            {
+                case "Stun Control": Destroy(fsm); break;
+                case "Control":
+                    controlFsm = fsm;
+                    healthManager = fsm.GetComponent<HealthManager>();
+                    transform = fsm.gameObject.transform;
+                    foundWatcher = true;
+                    break;
+            }
+            HeroController.instance.OnTakenDamage += () =>
+            {
+                if (!StateData.undergroundStates.Contains(controlFsm.ActiveStateName) && !pcrSlamming) controlFsm.SetState("Dig In 1");
+                ResetFlags();
+            };
             ResetFlags();
+            SetupWatcher();
         };
-        ResetFlags();
-        SetupWatcher();
+        CustomBehaviour.skProjectile = ManagedAsset<GameObject>.FromNonSceneAsset("Assets/Prefabs/Hornet Enemies/Song Knight Projectile.prefab", "localpoolprefabs_assets_areahangareasong");
     }
     public static void ResetFlags()
     {
@@ -139,7 +139,6 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                 CustomBehaviour.groundWave = Instantiate(CustomBehaviour.sandburst);
                 CustomBehaviour.groundWave.SetActive(false);
                 Helpers.SandColorSetup(CustomBehaviour.groundWave);
-                Helpers.SandSpeedSetup(CustomBehaviour.groundWave);
                 var damagerHitboxOriginal = CustomBehaviour.groundWave.transform.FindRelativeTransformWithPath("damager", false).GetComponent<PolygonCollider2D>();
                 Vector2[] points = [ new(-10, 3), new(10, 3), new(-10, 0), new(10, 0) ];
                 damagerHitboxOriginal.SetPath(0, points);
@@ -160,6 +159,9 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                     var main = pt.main;
                     main.maxParticles = 1000;
                 }
+                CustomBehaviour.pcrBurst = Instantiate(CustomBehaviour.groundWave);
+                CustomBehaviour.pcrBurst.SetActive(false);
+                Helpers.SandSpeedSetup(CustomBehaviour.groundWave);
             }
             if (PHASE_2) Instance.StartCoroutine(CustomBehaviour.SpawnSandWave());
         });
@@ -184,6 +186,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             }
             ResetFlags();
         });
+        controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ => { if (!pcrSlamming) Instance.StartCoroutine(CustomBehaviour.PCRSlams()); });
         controlFsm.GetState("Uppercut Antic")!.AddLambdaMethod(_ =>
         {
             if (Random.Range(0, 3) == 0)
