@@ -10,6 +10,7 @@ public static class CustomBehaviour
 {
     //private const float WATCHER_GROUND_Y = 8.3275f;
     private const float SANDBURST_DEFAULT_Y = 6.552498f;
+    private const float WINDSLASH_DEFAULT_Y = 7.327499f;
     public static ManagedAsset<GameObject> skProjectile = null!;
     private static GameObject skProjectileSetup = null!;
     public static GameObject groundWave = null!;
@@ -27,7 +28,7 @@ public static class CustomBehaviour
 
     public static IEnumerator spawnSkProjectile()
     {
-        if (AeternalEverwatcherPlugin.fiveSLash) yield break;
+        if (AeternalEverwatcherPlugin.fiveSLash || AeternalEverwatcherPlugin.eigongAirDashing) yield break;
         if (!skProjectileSetup)
         {
             yield return skProjectile.Load();
@@ -50,7 +51,7 @@ public static class CustomBehaviour
         instance.transform.position = AeternalEverwatcherPlugin.transform.position;
         instance.transform.SetPositionAndRotation(new Vector3(
             HeroController.instance.transform.position.x + (Helpers.ObjLeftOfHornet(instance) ? 15 : -15),
-            AeternalEverwatcherPlugin.transform.position.y - 1,
+            WINDSLASH_DEFAULT_Y,
             AeternalEverwatcherPlugin.transform.position.z
         ), !Helpers.ObjLeftOfHornet(instance) ? Quaternion.Euler(0, 180, 0) : Quaternion.Euler(0, 0, 0));
         instance.transform.localScale = new Vector3(1.75f, Random.Range(1.8f, 2.2f), 1);
@@ -75,10 +76,28 @@ public static class CustomBehaviour
     public static IEnumerator SpawnGroundWave()
     {
         AeternalEverwatcherPlugin.ResetFlags();
+        AeternalEverwatcherPlugin.eigongAirDashing = AeternalEverwatcherPlugin.PHASE_3;
         AeternalEverwatcherPlugin.controlFsm.SetState("Wake Roar 2");
-        yield return new WaitForSeconds(0.5f);
-        AeternalEverwatcherPlugin. controlFsm.SetState("Dig In 1");
+        yield return new WaitForSeconds(AeternalEverwatcherPlugin.PHASE_3 ? 0.775f : 0.5f);
         CreateWave(groundWave, new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation:false);
+        if (!AeternalEverwatcherPlugin.PHASE_3) AeternalEverwatcherPlugin. controlFsm.SetState("Dig In 1");
+        else if (!AeternalEverwatcherPlugin.pcrSlamming)
+        {
+            AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + (Random.Range(0, 2) == 0 ? -7 : 7), HeroController.instance.transform.position.y + 3, "Slash Combo Antic Q"));
+            AeternalEverwatcherPlugin.Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.1f));
+            yield return new WaitForSeconds(0.5f);
+            CreateWave(groundWave, new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation:false);
+            AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + (Random.Range(0, 2) == 0 ? -7 : 7), HeroController.instance.transform.position.y + 3, "Slash Combo Antic Q"));
+            AeternalEverwatcherPlugin.Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.1f));
+            yield return new WaitForSeconds(0.5f);
+            CreateWave(groundWave, new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation:false);
+            AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + (Random.Range(0, 2) == 0 ? -7 : 7), HeroController.instance.transform.position.y + 3, "Slash Combo Antic Q"));
+            AeternalEverwatcherPlugin.Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.1f));
+            yield return new WaitForSeconds(0.5f);
+            AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + (Random.Range(0, 2) == 0 ? -7 : 7), HeroController.instance.transform.position.y + 4, "Uppercut End"));
+        }
+        yield return new WaitForSeconds(0.2f);
+        AeternalEverwatcherPlugin.eigongAirDashing = false;
     }
     private static GameObject CreateWave(GameObject go, Vector3 position, float delayToDestruction = 1, bool rotation = true)
     {
@@ -151,13 +170,8 @@ public static class CustomBehaviour
         pcrSlamsEndWave = true;
         AeternalEverwatcherPlugin.controlFsm.SetState("Uppercut Antic Q");
         yield return new WaitForSeconds(0.65f);
-        AeternalEverwatcherPlugin.controlFsm.SetState("Jump Away Launch");
+        AeternalEverwatcherPlugin.controlFsm.SetState("Jump Away Air");
         AeternalEverwatcherPlugin.pcrSlamming = false;
-    }
-    
-    public static IEnumerator EigongAirDashes()
-    {
-        yield return null;
     }
     
     public static IEnumerator QuadWindSlash()
