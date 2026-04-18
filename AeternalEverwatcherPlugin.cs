@@ -1,14 +1,7 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using BepInEx;
 using BepInEx.Logging;
-using GlobalEnums;
-using GlobalSettings;
 using HarmonyLib;
-using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
 using Silksong.AssetHelper.ManagedAssets;
 using Silksong.FsmUtil;
@@ -26,19 +19,26 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     private static readonly ManualLogSource logger = BepInEx.Logging.Logger.CreateLogSource("[Aeternal Everwatcher]");
     public static void log(string msg) => logger.LogInfo(msg);
     public static AeternalEverwatcherPlugin Instance { get; set; } = null!;
-    private static ManagedAsset<GameObject> skProjectile;
 
     private static bool PHASE_2 = true;
     private static bool PHASE_3 = true;
-    private static bool DAMAGE_RESET = false;
-    private static float SANDBURST_DEFAULT_Y = 6.552498f;
+    public static PlayMakerFSM controlFsm = null!;
+    public static HealthManager healthManager = null!;
+    public new static Transform transform = null!;
+    public static bool foundWatcher;
+    private static bool jumpSlashAnticHappened;
+    private static bool didSlashCombo1;
+    private static bool didJumpSlashLaunch;
+    public static bool fiveSLash;
+    private static bool fiveSLashedOnce;
+
     private void Awake()
     {
         Instance = this;
         Logger.LogInfo($"Plugin {Name} ({Id}) has loaded!");
-        Harmony.CreateAndPatchAll(typeof(AeternalEverwatcherPlugin));
+        Harmony.CreateAndPatchAll(typeof(PatchesLikeFromEldenRing));
         SceneManager.sceneLoaded += SceneLoadSetup;
-        skProjectile = ManagedAsset<GameObject>.FromNonSceneAsset("Assets/Prefabs/Hornet Enemies/Song Knight Projectile.prefab", "localpoolprefabs_assets_areahangareasong");
+        CustomBehaviour.skProjectile = ManagedAsset<GameObject>.FromNonSceneAsset("Assets/Prefabs/Hornet Enemies/Song Knight Projectile.prefab", "localpoolprefabs_assets_areahangareasong");
     }
     private static void SceneLoadSetup(Scene scene, LoadSceneMode mode)
     {
@@ -53,45 +53,67 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                 foundWatcher = true;
                 break;
         }
-
         HeroController.instance.OnTakenDamage += () =>
         {
-            controlFsm.SetState("Dig In 1");
-            controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 1;
-            didSlashCombo1 = false;
-            didJumpSlashLaunch = false;
-            jumpSlashAnticHappened = false;
+            if (!StateData.undergroundStates.Contains(controlFsm.ActiveStateName)) controlFsm.SetState("Dig In 1");
+            ResetFlags();
         };
+        ResetFlags();
         SetupWatcher();
     }
-    private static PlayMakerFSM controlFsm = null!;
-    private static HealthManager healthManager = null!;
-    private static Transform transform = null!;
-    private static bool foundWatcher;
-    private static bool jumpSlashAnticHappened;
-    private static bool didSlashCombo1;
-    private static bool didJumpSlashLaunch;
+    public static void ResetFlags()
+    {
+        didSlashCombo1 = false;
+        didJumpSlashLaunch = false;
+        jumpSlashAnticHappened = false;
+        fiveSLash = false;
+        fiveSLashedOnce = false;
+    }
     private static void SetupWatcher()
     {
+        controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.3f;
         controlFsm.GetFirstActionOfType<StartRoarEmitter>("Wake Roar 2")!.stunHero = false;
         controlFsm.GetFirstActionOfType<Wait>("Wake Roar 2")!.time = 0.5f;
         controlFsm.GetFirstActionOfType<Wait>("Idle")!.time = 0;
         controlFsm.GetFirstActionOfType<Wait>("Range Out Pause")!.time = 0;
         controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 0;
-        controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.5f;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 120;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Uppercut 1")!.speed = 70;
-        controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = GetPosDiffSpeed() * -1);
-        controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = GetPosDiffSpeed() * -1);
-        controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = GetPosDiffSpeed());
-        controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:true));
-        controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = GetPosDiffSpeed() * -0.5f);
-        controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.speed = GetPosDiffSpeed() * -0.75f);
+        controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ =>
+        {
+            Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.55f));
+            controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : Helpers.GetPosDiffSpeed() * -1;
+        });
+        controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ =>
+        {
+            Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.45f));
+            controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : Helpers.GetPosDiffSpeed() * -1;
+        });
+        controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = Helpers.GetPosDiffSpeed() * (fiveSLash ? -1 : 1));
+        controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:!fiveSLash));
+        controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = Helpers.GetPosDiffSpeed() * -0.5f);
+        controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ =>
+        {
+            if (fiveSLash)
+            {
+                if (!fiveSLashedOnce)
+                {
+                    Instance.StartCoroutine(CustomBehaviour.Teleport(HeroController.instance.transform.position.x + 3.5f * transform.localScale.x * -1, transform.position.y, "Slash Combo Antic Q"));
+                    fiveSLashedOnce = true;
+                }
+                else
+                {
+                    Instance.StartCoroutine(CustomBehaviour.Teleport(HeroController.instance.transform.position.x + 5f * transform.localScale.x, transform.position.y, "Slash Combo 8"));
+                    fiveSLashedOnce = false;
+                }
+            }
+        });
+        controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.speed = Helpers.GetPosDiffSpeed() * -0.75f);
         controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ =>
         {
             var num = Random.Range(0, 3);
-            if (num == 0) Instance.StartCoroutine(jumpSlashMixup()); 
-            else if (num == 1) Instance.StartCoroutine(SpawnGroundWave());
+            if (num == 0) Instance.StartCoroutine(CustomBehaviour.jumpSlashMixup()); 
+            else if (num == 1) Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave());
         });
         controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<FloatMultiply>("Jump Slash Launch")!.multiplyBy = 8);
         controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ => jumpSlashAnticHappened = true);
@@ -101,272 +123,82 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetState("Blocked Hit")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash New"));
         controlFsm.GetState("Uppercut End")!.AddLambdaMethod(_ => controlFsm.SetState("Uppercut Launch"));
         controlFsm.GetState("Dash To Jump")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
-        controlFsm.GetState("Slash Combo 3")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(spawnSkProjectile()); });
-        controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(spawnSkProjectile()); });
-        controlFsm.GetState("F Slash Recover")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(spawnSkProjectile()); });
-        controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(SpawnSandWave()); });
+        controlFsm.GetState("Very Far")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()));
+        controlFsm.GetState("Slash Combo 3")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile()); });
+        controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile()); });
+        controlFsm.GetState("F Slash Recover")!.AddLambdaMethod(_ => { if (PHASE_2) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile()); });
+        controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ =>
+        {
+            if (!CustomBehaviour.sandburst)
+            {
+                var sandburstOriginal = GameObject.Find("sand_burst_effect_uppercut");
+                Helpers.SandColorSetup(sandburstOriginal);
+                CustomBehaviour.sandburst = Instantiate(sandburstOriginal);
+                CustomBehaviour.sandburst.SetActive(false);
+                Helpers.SandSpeedSetup(CustomBehaviour.sandburst, 3);
+                CustomBehaviour.groundWave = Instantiate(CustomBehaviour.sandburst);
+                CustomBehaviour.groundWave.SetActive(false);
+                Helpers.SandColorSetup(CustomBehaviour.groundWave);
+                Helpers.SandSpeedSetup(CustomBehaviour.groundWave);
+                var damagerHitboxOriginal = CustomBehaviour.groundWave.transform.FindRelativeTransformWithPath("damager", false).GetComponent<PolygonCollider2D>();
+                Vector2[] points = [ new(-10, 3), new(10, 3), new(-10, 0), new(10, 0) ];
+                damagerHitboxOriginal.SetPath(0, points);
+                foreach (var pt in CustomBehaviour.groundWave.GetComponentsInChildren<ParticleSystem>(true))
+                {
+                    // for some FUCKASS reason i need to get a ref to the shape before changing its scale wtff???
+                    var shape = pt.shape;
+                    shape.scale = new Vector3(6, 0.1f, 1);
+                    var emission = pt.emission;
+                    var bursts = new ParticleSystem.Burst[emission.burstCount];
+                    emission.GetBursts(bursts);
+                    for (var i = 0; i < bursts.Length; i++)
+                    {
+                        bursts[i].minCount *= 20;
+                        bursts[i].maxCount *= 20;
+                    }
+                    emission.SetBursts(bursts);
+                    var main = pt.main;
+                    main.maxParticles = 1000;
+                }
+            }
+            if (PHASE_2) Instance.StartCoroutine(CustomBehaviour.SpawnSandWave());
+        });
         controlFsm.GetState("Dig Out Uppercut")!.AddLambdaMethod(_ =>
         {
-            if (sandburst == null) Instance.StartCoroutine(SpawnSandWave());
+            if (CustomBehaviour.sandburst == null) Instance.StartCoroutine(CustomBehaviour.SpawnSandWave());
         });
-        controlFsm.GetState("Slash Combo 1")!.AddLambdaMethod(_ => { if (PHASE_2) didSlashCombo1 = true; });
+        controlFsm.GetState("Slash Combo 1")!.AddLambdaMethod(_ => { if (PHASE_2 && !fiveSLash) didSlashCombo1 = true; });
         controlFsm.GetState("Jump Slash Launch")!.AddLambdaMethod(_ => { if (PHASE_2) { didJumpSlashLaunch = true; } });
         controlFsm.GetState("Dash To Antic")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
         controlFsm.GetFirstActionOfType<FaceObjectV2>("Uppercut Antic")!.everyFrame = true;
-
-        controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ => {
+        controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ =>
+        {
+            if (CustomBehaviour.sandburstSmall == null)
+            {
+                CustomBehaviour.sandburstSmall = transform.Find("Pt SwordSlam").gameObject;
+                Helpers.SandColorSetup(CustomBehaviour.sandburstSmall);
+            }
             if (PHASE_2 && (didSlashCombo1 || didJumpSlashLaunch))
             {
-                didSlashCombo1 = false;
-                didJumpSlashLaunch = false;
-                Instance.StartCoroutine(SpawnSandWave(transform.localScale.x == 1, transform.localScale.x == -1));
-            } });
-    }
-    private static IEnumerator jumpSlashMixup()
-    {
-        yield return new WaitForSeconds(0.2f);
-        controlFsm.SetState("Jump Slash Antic");
-    }
-    private static IEnumerator spawnSkProjectile()
-    {
-        yield return skProjectile.Load();
-        var instance = skProjectile.InstantiateAsset();
-        instance.transform.position = transform.position;
-        instance.GetComponent<Collider2D>().isTrigger = true;
-        MakeProjectileIgnoreEnvironment(instance);
-        RemoveProjectileWallEvents(instance);
-        instance.AddComponent<ProjectileMover>();
-        instance.transform.SetPositionAndRotation(new Vector3(
-            HeroController.instance.transform.position.x + (ObjLeftOfHornet(instance) ? 15 : -15),
-            transform.position.y - 1,
-            transform.position.z
-        ), !ObjLeftOfHornet(instance) ? Quaternion.Euler(0, 180, 0) : Quaternion.Euler(0, 0, 0));
-        instance.transform.localScale = new Vector3(1.75f, Random.Range(1.8f, 2.2f), 1);
-        instance.transform.SetLocalRotation2D(Random.Range(-10, 10));
-        var left1 = Instantiate(sandburst);
-        left1.transform.position = new Vector3(HeroController.instance.transform.position.x + (ObjLeftOfHornet(instance) ? -13 : 13), sandburst.transform.position.y, sandburst.transform.position.z);
-        left1.SetActive(false);
-        left1.SetActive(true);
-        yield return new WaitForSeconds(1);
-        Destroy(left1);
-    }
-
-    private static IEnumerator Teleport(float x, float y, string nextState)
-    {
-        //! i think it breaks because it has vertical speed as soon as it gets out
-        //! on second thought just mask the tp out and tp in with a sand wave and move him manually fuck it 
-        controlFsm.SetState("Jump Away Launch");
-        yield return new WaitForSeconds(0.1f);
-        controlFsm.SetState("Dig In 1");
-        controlFsm.GetFirstActionOfType<SetPosition>("Dig Pos")!.x = x;
-        controlFsm.GetFirstActionOfType<SetPosition>("Dig Pos")!.y = y;
-        yield return new WaitForSeconds(0.2f);
-        controlFsm.SetState("Dig Out 1");
-        yield return new WaitForSeconds(0.2f);
-        controlFsm.SetState(nextState);
-    }
-    private static IEnumerator SpawnGroundWave()
-    {
-        var oldPos = transform.position;
-        //! find something to give this attack to
-        controlFsm.SetState("Wake Roar 2");
-        yield return new WaitForSeconds(0.5f);
-        controlFsm.SetState("Dig In 1");
-        for (var i = 0; i < 20; i++)
-        {
-            yield return new WaitForSeconds(0.05f);
-            CreateWave(new Vector3(oldPos.x + i * 4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z));
-            CreateWave(new Vector3(oldPos.x + i * -4, SANDBURST_DEFAULT_Y - 5, sandburst.transform.position.z));
-        }
-    }
-    private static void CreateWave(Vector3 position)
-    {
-        var wave = Instantiate(sandburst);
-        wave.transform.position = position;
-        wave.transform.SetRotation2D(Random.Range(-5, 5));
-        wave.SetActive(false);
-        wave.SetActive(true);
-    }
-    private static GameObject sandburst;
-    private static IEnumerator SpawnSandWave(bool left = true, bool right = true)
-    {
-        yield return new WaitForSeconds(0.2f);
-        if (sandburst == null) sandburst = transform.Find("sand_burst_effect_uppercut").gameObject;
-        else if (left && right)
-        {
-            var left1 = Instantiate(sandburst);
-            left1.transform.position = new Vector3(sandburst.transform.position.x - 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left1.SetActive(false);
-            left1.SetActive(true);
-            var right1 = Instantiate(sandburst);
-            right1.transform.position = new Vector3(sandburst.transform.position.x + 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right1.SetActive(false);
-            right1.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var left2 = Instantiate(sandburst);
-            left2.transform.position = new Vector3(sandburst.transform.position.x - 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left2.SetActive(false);
-            left2.SetActive(true);
-            var right2 = Instantiate(sandburst);
-            right2.transform.position = new Vector3(sandburst.transform.position.x + 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right2.SetActive(false);
-            right2.SetActive(true);
-            yield return new WaitForSeconds(1);
-            Destroy(left1);
-            Destroy(left2);
-            Destroy(right1);
-            Destroy(right2);
-        } else if (left)
-        {
-            var left1 = Instantiate(sandburst);
-            left1.transform.position = new Vector3(transform.position.x - 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left1.SetActive(false);
-            left1.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var left2 = Instantiate(sandburst);
-            left2.transform.position = new Vector3(transform.position.x - 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left2.SetActive(false);
-            left2.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var left3 = Instantiate(sandburst);
-            left3.transform.position = new Vector3(transform.position.x - 15, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            left3.SetActive(false);
-            left3.SetActive(true);
-            yield return new WaitForSeconds(1);
-            Destroy(left1);
-            Destroy(left2);
-            Destroy(left3);
-        } else if (right)
-        {
-            var right1 = Instantiate(sandburst);
-            right1.transform.position = new Vector3(transform.position.x + 5, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right1.SetActive(false);
-            right1.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var right2 = Instantiate(sandburst);
-            right2.transform.position = new Vector3(transform.position.x + 10, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right2.SetActive(false);
-            right2.SetActive(true);
-            yield return new WaitForSeconds(0.2f);
-            var right3 = Instantiate(sandburst);
-            right3.transform.position = new Vector3(transform.position.x + 15, SANDBURST_DEFAULT_Y, sandburst.transform.position.z);
-            right3.SetActive(false);
-            right3.SetActive(true);
-            yield return new WaitForSeconds(1);
-            Destroy(right1);
-            Destroy(right2);
-            Destroy(right3);
-        }
-    }
-
-    private static bool ObjLeftOfHornet(GameObject go) => go.transform.position.x < HeroController.instance.transform.position.x;
-    private static void MakeProjectileIgnoreEnvironment(GameObject projectile)
-    {
-        var colliders = projectile.GetComponentsInChildren<Collider2D>(true);
-        if (colliders == null || colliders.Length == 0) return;
-        foreach (var col in colliders)
-        {
-            int environmentLayer = LayerMask.NameToLayer("Terrain");
-            if (environmentLayer >= 0) Physics2D.IgnoreLayerCollision(projectile.layer, environmentLayer, true);
-            col.isTrigger = true;
-        }
-    }
-    private static void RemoveProjectileWallEvents(GameObject projectile)
-    {
-        var fsm = projectile.LocateMyFSM("Control");
-        foreach (var state in fsm.FsmStates)
-        {
-            var newTransitions = state.Transitions
-                .Where(t => !t.EventName.Equals("WALL", StringComparison.OrdinalIgnoreCase))
-                .ToArray();
-
-            if (newTransitions.Length != state.Transitions.Length) state.Transitions = newTransitions;
-        }
-        foreach (var stateName in new[] { "Wall End", "Floor?" })
-        {
-            var s = fsm.GetState(stateName);
-            if (s != null)
-            {
-                s.Transitions = [];
-                s.Actions = [];
+                Instance.StartCoroutine(CustomBehaviour.SpawnSandWave(transform.localScale.x == 1, transform.localScale.x == -1));
             }
-        }
-    }
-    
-    private static float GetPosDiffSpeed() => Mathf.Clamp(Math.Abs(HeroController.instance.transform.position.x - transform.position.x) * 30, 230, 270);
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(HealthManager), nameof(HealthManager.Hit))]
-    private static void HealthManager_Hit(HealthManager __instance) => __instance.invincible = foundWatcher;
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(HealthManager), nameof(HealthManager.Invincible))]
-    private static void HealthManager_Invincible(HealthManager __instance, HitInstance hitInstance)
-    {
-        if (!parryableStates.Contains(controlFsm.ActiveStateName)) return;
-        if (__instance.gameObject.transform.root.Find("Body Damager").TryGetComponent<DamageHero>(out var damager))
+            ResetFlags();
+        });
+        controlFsm.GetState("Uppercut Antic")!.AddLambdaMethod(_ =>
         {
-            Instance.StartCoroutine(damager.NailClash(0, "Nail Attack", transform.position));
-            GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
-        }
-    }
-    [HarmonyPostfix]
-    [HarmonyPatch(typeof(DamageHero), nameof(DamageHero.NailClash))]
-    private static void DamageHero_NailClash(DamageHero __instance)
-    {
-        log(controlFsm.ActiveStateName);
-        if (iframeStates.Contains(controlFsm.ActiveStateName)) HeroController.instance.StartInvulnerable(0.3f);
-        if (!GameManager.instance.TimeSlowed) GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
-        
-        return;
-        if (__instance == null) return;
-        healthManager.TakeDamage(new HitInstance
-        {
-            Source = HeroController.instance.gameObject,
-            AttackType = AttackTypes.Nail,
-            DamageDealt = PlayerData.instance.nailDamage,
-            Direction = 270,
-            Multiplier = 1f,
-            MagnitudeMultiplier = 1f,
-            IgnoreInvulnerable = true,
-            IsNailTag = true
+            if (Random.Range(0, 3) == 0)
+            {
+                fiveSLash = true;
+                fiveSLashedOnce = false;
+                controlFsm.SetState("Slash Combo Antic Q");
+            }
         });
     }
-
-    private static readonly HashSet<string> iframeStates =
-    [
-        "Uppercut 1",
-        "Uppercut 2",
-        "Uppercut 3",
-        "Dig Out Uppercut",
-        "Slash Combo 9",
-        "Slash Combo 10",
-        "Slash Combo 11",
-        "Slash Combo 12",
-    ];
-    private static readonly HashSet<string> parryableStates =
-    [
-        "Slash Combo 1",
-        "Slash Combo 2",
-        "Slash Combo 3",
-        "Slash Combo 5",
-        "Slash Combo 6",
-        "Slash Combo 7",
-        "Slash Combo 9",
-        "Slash Combo 10",
-        "F Slash 2",
-        "F Slash 3",
-        "F Slash 4",
-        "Uppercut 1",
-        "Uppercut 2",
-        "Uppercut 3",
-        "Dig Out Uppercut"
-    ];
-
     private void Update()
     {
         try
         {
             HeroController.instance.MaxHealth();
         } catch {/*ignored*/}
-        //log(controlFsm.ActiveStateName);
     }
 }
