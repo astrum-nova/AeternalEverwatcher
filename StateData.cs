@@ -24,7 +24,7 @@ public static class StateData
         "Slash Combo 9",
         "Slash Combo 10",
         "Slash Combo 11",
-        "Slash Combo 12",
+        "Slash Combo 12"
     ];
     public static readonly HashSet<string> parryableStates =
     [
@@ -42,6 +42,9 @@ public static class StateData
         "Uppercut 1",
         "Uppercut 2",
         "Uppercut 3",
-        "Dig Out Uppercut"
+        "Dig Out Uppercut",
+        "Jump Slash Launch",
+        "Jump Slash Air",
+        "Jump Slash New"
     ];
 }
