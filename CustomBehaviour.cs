@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using GlobalEnums;
 using GlobalSettings;
 using HutongGames.PlayMaker.Actions;
 using Silksong.AssetHelper.ManagedAssets;
@@ -86,14 +87,17 @@ public static class CustomBehaviour
         else if (!AeternalEverwatcherPlugin.pcrSlamming)
         {
             yield return new WaitForSeconds(0.4f);
-            var xOffset = Random.Range(0, 2) == 0 ? -7 : 7;
+            if (HeroController.instance.transform.position.y < 11.5) HeroController.instance.TakeDamage(null, CollisionSide.top, 2, HazardType.NON_HAZARD);
+            var xOffset = Random.Range(0, 2) == 0 ? -9 : 9;
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + xOffset, HeroController.instance.transform.position.y + 3, "F Slash Antic"));
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.1f));
             yield return new WaitForSeconds(0.5f);
+            if (HeroController.instance.transform.position.y < 11.5) HeroController.instance.TakeDamage(null, CollisionSide.top, 2, HazardType.NON_HAZARD);
             CreateWave(groundWave, new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation:false);
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x - xOffset, HeroController.instance.transform.position.y + 3, "F Slash Antic"));
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.1f));
             yield return new WaitForSeconds(0.5f);
+            if (HeroController.instance.transform.position.y < 11.5) HeroController.instance.TakeDamage(null, CollisionSide.top, 2, HazardType.NON_HAZARD);
             CreateWave(groundWave, new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation:false);
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + xOffset, HeroController.instance.transform.position.y + 3, "F Slash Antic"));
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.1f));
@@ -180,6 +184,23 @@ public static class CustomBehaviour
     
     public static IEnumerator QuadWindSlash()
     {
-        yield return null;
+        AeternalEverwatcherPlugin.quadSlashing = true;
+        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo Antic Q");
+        yield return new WaitForSeconds(0.2f);
+        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 5");
+        AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
+        yield return new WaitForSeconds(0.4f);
+        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 5");
+        AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
+        yield return new WaitForSeconds(0.2f);
+        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 5");
+        AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
+        yield return new WaitForSeconds(0.4f);
+        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 5");
+        AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
+        yield return new WaitForSeconds(0.2f);
+        
+        AeternalEverwatcherPlugin.controlFsm.SetState("Range Check");
+        AeternalEverwatcherPlugin.quadSlashing = false;
     }
 }
