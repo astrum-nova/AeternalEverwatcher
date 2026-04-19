@@ -47,6 +47,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             {
                 case "Stun Control": Destroy(fsm); break;
                 case "Control":
+                    fsm.Preprocess();
                     controlFsm = fsm;
                     healthManager = fsm.GetComponent<HealthManager>();
                     transform = fsm.gameObject.transform;
@@ -77,28 +78,36 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     }
     private static void SetupWatcher()
     {
-        controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.3f;
+        // --- Initialization & Intro (Top Center) ---
         controlFsm.GetFirstActionOfType<StartRoarEmitter>("Wake Roar 2")!.stunHero = false;
         controlFsm.GetFirstActionOfType<Wait>("Wake Roar 2")!.time = 0.5f;
-        controlFsm.GetFirstActionOfType<Wait>("Idle")!.time = 0;
-        controlFsm.GetFirstActionOfType<Wait>("Range Out Pause")!.time = 0;
         controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 0;
-        controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 120;
-        controlFsm.GetFirstActionOfType<SetVelocityByScale>("Uppercut 1")!.speed = 70;
-        controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ =>
-        {
-            Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.55f));
-            controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : Helpers.GetPosDiffSpeed() * -1 * (quadSlashing ? 0 : 1);
-        });
+
+        // --- Neutral & Range Checking (Middle Section) ---
+        controlFsm.GetFirstActionOfType<Wait>("Idle")!.time = 0;
+        controlFsm.GetState("Very Far")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()));
+        controlFsm.GetFirstActionOfType<Wait>("Range Out Pause")!.time = 0;
+
+        // --- Slash Combo Branch (Left Side) ---
+        controlFsm.GetFirstActionOfType<FaceObjectV2>("Slash Combo Antic Q")!.everyFrame = true;
         controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ =>
         {
             Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.45f));
-            controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : Helpers.GetPosDiffSpeed() * -1 * (quadSlashing ? 0 : 1);
-            if (quadSlashing) controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = 0;
+            controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : Helpers.GetPosDiffSpeed() * -1;
         });
-        controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = Helpers.GetPosDiffSpeed() * (fiveSLash ? -1 : 1) * (quadSlashing ? 0 : 1));
+
+        controlFsm.GetFirstActionOfType<FaceObjectV2>("Slash Combo Antic")!.everyFrame = true;
+        controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ =>
+        {
+            Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.55f));
+            controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : Helpers.GetPosDiffSpeed() * -1;
+        });
+
+        controlFsm.GetState("Slash Combo 1")!.AddLambdaMethod(_ => { if (PHASE_2 && !fiveSLash && !quadSlashing) didSlashCombo1 = true; });
+        controlFsm.GetState("Slash Combo 3")!.AddLambdaMethod(_ => { if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile()); });
+        controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = Helpers.GetPosDiffSpeed() * (fiveSLash ? -1 : 1));
         controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:!fiveSLash && !quadSlashing));
-        controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = Helpers.GetPosDiffSpeed() * -0.5f * (quadSlashing ? 0 : 1));
+
         controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ =>
         {
             if (fiveSLash && !pcrSlamming && !eigongAirDashing)
@@ -114,88 +123,10 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                     fiveSLashedOnce = false;
                 }
             }
-        });
-        controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ =>
-        {
-            controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.ySpeed = eigongAirDashing ? -50 : 0;
-            controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.speed = Helpers.GetPosDiffSpeed() * -0.75f * (eigongAirDashing ? 0.75f : 1) * (quadSlashing ? 0 : 1);
-            if (eigongAirDashing || quadSlashing) return;
-            var num = 0;// Random.Range(0, 3);
-            if (num == 0) Instance.StartCoroutine(CustomBehaviour.jumpSlashMixup()); 
-            else if (num == 1) Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()); 
-        });
-        controlFsm.GetState("F Slash Recover")!.AddLambdaMethod(_ =>
-        {
             if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile());
-            else if (PHASE_3 && eigongAirDashing) controlFsm.SetState("F Slash Antic");
         });
-        controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ =>
-        {
-            if ((Random.Range(0, 2) == 0 || true) && !quadSlashing)
-            {
-                Instance.StartCoroutine(CustomBehaviour.QuadWindSlash());
-            }
-            jumpSlashAnticHappened = true;
-            controlFsm.GetFirstActionOfType<SetVelocity2d>("Jump Slash Launch")!.y = 45;
-            controlFsm.GetFirstActionOfType<FloatMultiply>("Jump Slash Launch")!.multiplyBy = 100;
-        });
-        //controlFsm.GetState("Jump Slash Air")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:jumpSlashAnticHappened));
-        controlFsm.GetState("Jump Slash New")!.AddLambdaMethod(_ => jumpSlashAnticHappened = false);
-        controlFsm.GetState("Blocked Hit")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash New"));
-        controlFsm.GetState("Uppercut End")!.AddLambdaMethod(_ => controlFsm.SetState("Uppercut Launch"));
-        controlFsm.GetState("Dash To Jump")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
-        controlFsm.GetState("Very Far")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()));
-        controlFsm.GetState("Slash Combo 3")!.AddLambdaMethod(_ => { if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile()); });
-        controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ => { if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile()); });
-        controlFsm.GetState("Slash Combo 13")!.AddLambdaMethod(_ => controlFsm.SetState("Range Check"));
-        controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ =>
-        {
-            if (!CustomBehaviour.sandburst)
-            {
-                var sandburstOriginal = GameObject.Find("sand_burst_effect_uppercut");
-                Helpers.SandColorSetup(sandburstOriginal);
-                CustomBehaviour.sandburst = Instantiate(sandburstOriginal);
-                CustomBehaviour.sandburst.SetActive(false);
-                Helpers.SandSpeedSetup(CustomBehaviour.sandburst, 3);
-                CustomBehaviour.groundWave = Instantiate(CustomBehaviour.sandburst);
-                CustomBehaviour.groundWave.SetActive(false);
-                Helpers.SandColorSetup(CustomBehaviour.groundWave);
-                var damagerHitboxOriginal = CustomBehaviour.groundWave.transform.FindRelativeTransformWithPath("damager", false).GetComponent<PolygonCollider2D>();
-                Vector2[] points = [ new(-10, 3), new(10, 3), new(-10, 0), new(10, 0) ];
-                damagerHitboxOriginal.SetPath(0, points);
-                foreach (var pt in CustomBehaviour.groundWave.GetComponentsInChildren<ParticleSystem>(true))
-                {
-                    // for some FUCKASS reason i need to get a ref to the shape before changing its scale wtff???
-                    var shape = pt.shape;
-                    shape.scale = new Vector3(6, 0.1f, 1);
-                    var emission = pt.emission;
-                    var bursts = new ParticleSystem.Burst[emission.burstCount];
-                    emission.GetBursts(bursts);
-                    for (var i = 0; i < bursts.Length; i++)
-                    {
-                        bursts[i].minCount *= 20;
-                        bursts[i].maxCount *= 20;
-                    }
-                    emission.SetBursts(bursts);
-                    var main = pt.main;
-                    main.maxParticles = 1000;
-                }
-                CustomBehaviour.pcrBurst = Instantiate(CustomBehaviour.groundWave);
-                CustomBehaviour.pcrBurst.SetActive(false);
-                Helpers.SandSpeedSetup(CustomBehaviour.groundWave);
-            }
-            if (PHASE_2) Instance.StartCoroutine(CustomBehaviour.SpawnSandWave());
-        });
-        controlFsm.GetState("Dig Out Uppercut")!.AddLambdaMethod(_ =>
-        {
-            if (CustomBehaviour.sandburst == null) Instance.StartCoroutine(CustomBehaviour.SpawnSandWave());
-        });
-        controlFsm.GetState("Slash Combo 1")!.AddLambdaMethod(_ => { if (PHASE_2 && !fiveSLash && !quadSlashing) didSlashCombo1 = true; });
-        controlFsm.GetState("Jump Slash Launch")!.AddLambdaMethod(_ => { if (PHASE_2) { didJumpSlashLaunch = true; } });
-        controlFsm.GetState("Dash To Antic")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
-        controlFsm.GetFirstActionOfType<FaceObjectV2>("Uppercut Antic")!.everyFrame = true;
-        controlFsm.GetFirstActionOfType<FaceObjectV2>("Slash Combo Antic")!.everyFrame = true;
-        controlFsm.GetFirstActionOfType<FaceObjectV2>("Slash Combo Antic Q")!.everyFrame = true;
+
+        controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = Helpers.GetPosDiffSpeed() * -0.5f);
         controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ =>
         {
             if (CustomBehaviour.sandburstSmall == null)
@@ -209,7 +140,39 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             }
             ResetFlags();
         });
-        controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ => { if (!pcrSlamming) Instance.StartCoroutine(CustomBehaviour.PCRSlams()); });
+        controlFsm.GetState("Slash Combo 13")!.AddLambdaMethod(_ => controlFsm.SetState("Range Check"));
+
+        // --- F Slash Branch (Between Left and Center) ---
+        controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ =>
+        {
+            controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.ySpeed = eigongAirDashing ? -50 : 0;
+            controlFsm.GetFirstActionOfType<SetVelocityByScale>("F Slash 2")!.speed = Helpers.GetPosDiffSpeed() * -0.75f * (eigongAirDashing ? 0.75f : 1) * (quadSlashing ? 0 : 1);
+            if (eigongAirDashing || quadSlashing) return;
+            var num = 0; // Random.Range(0, 3);
+            if (num == 0 && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.QuadWindSlash()); 
+            else if (num == 1 && !eigongAirDashing) Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()); 
+        });
+        controlFsm.GetState("F Slash Recover")!.AddLambdaMethod(_ =>
+        {
+            if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile());
+            else if (PHASE_3 && eigongAirDashing) controlFsm.SetState("F Slash Antic");
+        });
+
+        // --- Jump Slash / Dash Branch (Center / Right Center) ---
+        controlFsm.GetState("Blocked Hit")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash New"));
+        controlFsm.GetState("Dash To Jump")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
+        controlFsm.GetState("Dash To Antic")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
+        controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ =>
+        {
+            if (!quadSlashing) return;
+            Instance.StartCoroutine(CustomBehaviour.QuadWindSlash());
+        });
+
+        // --- Digging & Uppercut Branch (Far Right) ---
+        controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.3f;
+        controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 120;
+
+        controlFsm.GetFirstActionOfType<FaceObjectV2>("Uppercut Antic")!.everyFrame = true;
         controlFsm.GetState("Uppercut Antic")!.AddLambdaMethod(_ =>
         {
             var randy = Random.Range(0, 3);
@@ -220,6 +183,15 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                 controlFsm.SetState("Slash Combo Antic Q");
             } else if (randy == 1) controlFsm.SetState("Evade Antic");
         });
+
+        controlFsm.GetFirstActionOfType<SetVelocityByScale>("Uppercut 1")!.speed = 70;
+        controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ =>
+        {
+            if (!CustomBehaviour.sandburst) Helpers.InitSandEffects();
+            if (PHASE_2) Instance.StartCoroutine(CustomBehaviour.SpawnSandWave());
+            if (!pcrSlamming) Instance.StartCoroutine(CustomBehaviour.PCRSlams());
+        });
+        controlFsm.GetState("Uppercut End")!.AddLambdaMethod(_ => controlFsm.SetState("Uppercut Launch"));
     }
     private void Update()
     {

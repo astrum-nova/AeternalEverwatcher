@@ -73,6 +73,43 @@ public static class Helpers
             limitVelocity.dampen = 0.5f;
         }
     }
+    public static void GroundWaveSetup(GameObject wave)
+    {
+        var damagerHitboxOriginal = wave.transform.FindRelativeTransformWithPath("damager", false).GetComponent<PolygonCollider2D>();
+        Vector2[] points = [ new(-10, 3), new(10, 3), new(-10, 0), new(10, 0) ];
+        damagerHitboxOriginal.SetPath(0, points);
+        foreach (var pt in wave.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var shape = pt.shape;
+            shape.scale = new Vector3(6, 0.1f, 1);
+            var emission = pt.emission;
+            var bursts = new ParticleSystem.Burst[emission.burstCount];
+            emission.GetBursts(bursts);
+            for (var i = 0; i < bursts.Length; i++)
+            {
+                bursts[i].minCount *= 20;
+                bursts[i].maxCount *= 20;
+            }
+            emission.SetBursts(bursts);
+            var main = pt.main;
+            main.maxParticles = 1000;
+        }
+    }
+    public static void InitSandEffects()
+    {
+        var sandburstOriginal = GameObject.Find("sand_burst_effect_uppercut");
+        SandColorSetup(sandburstOriginal);
+        CustomBehaviour.sandburst = Object.Instantiate(sandburstOriginal);
+        CustomBehaviour.sandburst.SetActive(false);
+        SandSpeedSetup(CustomBehaviour.sandburst, 3);
+        CustomBehaviour.groundWave = Object.Instantiate(CustomBehaviour.sandburst);
+        CustomBehaviour.groundWave.SetActive(false);
+        SandColorSetup(CustomBehaviour.groundWave);
+        GroundWaveSetup(CustomBehaviour.groundWave);
+        CustomBehaviour.pcrBurst = Object.Instantiate(CustomBehaviour.groundWave);
+        CustomBehaviour.pcrBurst.SetActive(false);
+        SandSpeedSetup(CustomBehaviour.groundWave);
+    }
     public static IEnumerator FinishStateEarly(string eventName, float delay)
     {
         yield return new WaitForSeconds(delay);

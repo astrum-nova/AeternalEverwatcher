@@ -14,19 +14,11 @@ public static class CustomBehaviour
     private const float SANDBURST_DEFAULT_Y = 6.552498f;
     private const float WINDSLASH_DEFAULT_Y = 7.327499f;
     public static ManagedAsset<GameObject> skProjectile = null!;
-    private static GameObject skProjectileSetup = null!;
+    public static GameObject skProjectileSetup = null!;
     public static GameObject groundWave = null!;
     public static GameObject pcrBurst = null!;
     public static GameObject sandburst = null!;
     public static GameObject sandburstSmall = null!;
-
-    public static IEnumerator jumpSlashMixup()
-    {
-        //TODO: experiment with shortening the delay, right now hes telegraphing an F slash and randomly switching to this
-        // which is a bit confusing
-        yield return new WaitForSeconds(0.2f);
-        AeternalEverwatcherPlugin.controlFsm.SetState("Jump Slash Antic");
-    }
 
     public static IEnumerator spawnSkProjectile()
     {
@@ -52,10 +44,10 @@ public static class CustomBehaviour
     {
         instance.transform.position = AeternalEverwatcherPlugin.transform.position;
         instance.transform.SetPositionAndRotation(new Vector3(
-            HeroController.instance.transform.position.x + (Helpers.ObjLeftOfHornet(instance) ? 15 : -15),
+            HeroController.instance.transform.position.x + (Helpers.ObjLeftOfHornet(instance) || AeternalEverwatcherPlugin.quadSlashing ? 15 : -15),
             WINDSLASH_DEFAULT_Y,
             AeternalEverwatcherPlugin.transform.position.z
-        ), !Helpers.ObjLeftOfHornet(instance) ? Quaternion.Euler(0, 180, 0) : Quaternion.Euler(0, 0, 0));
+        ), !Helpers.ObjLeftOfHornet(instance) || AeternalEverwatcherPlugin.quadSlashing ? Quaternion.Euler(0, 180, 0) : Quaternion.Euler(0, 0, 0));
         instance.transform.localScale = new Vector3(1.75f, Random.Range(1.8f, 2.2f), 1);
         instance.transform.SetLocalRotation2D(Random.Range(-10, 10));
         /*Instance.StartCoroutine(CreateWave(new Vector3(
@@ -184,23 +176,33 @@ public static class CustomBehaviour
     
     public static IEnumerator QuadWindSlash()
     {
-        AeternalEverwatcherPlugin.quadSlashing = true;
-        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo Antic Q");
-        yield return new WaitForSeconds(0.2f);
-        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 5");
-        AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
-        yield return new WaitForSeconds(0.4f);
-        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 5");
-        AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
-        yield return new WaitForSeconds(0.2f);
-        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 5");
-        AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
-        yield return new WaitForSeconds(0.4f);
-        AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 5");
-        AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
-        yield return new WaitForSeconds(0.2f);
-        
-        AeternalEverwatcherPlugin.controlFsm.SetState("Range Check");
-        AeternalEverwatcherPlugin.quadSlashing = false;
+        if (!AeternalEverwatcherPlugin.quadSlashing)
+        {
+            AeternalEverwatcherPlugin.quadSlashing = true;
+            AeternalEverwatcherPlugin.controlFsm.SetState("F Slash Antic");
+            AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = true;
+            
+            yield return new WaitForSeconds(0.4f);
+            //AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
+            yield return new WaitForSeconds(0.4f);
+            AeternalEverwatcherPlugin.controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = 0;
+            AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 1");
+            AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = true;
+            //AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
+            yield return new WaitForSeconds(0.2f);
+            AeternalEverwatcherPlugin.controlFsm.SetState("F Slash 2");
+            AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = true;
+            //AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
+            yield return new WaitForSeconds(0.4f);
+            AeternalEverwatcherPlugin.controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = 0;
+            AeternalEverwatcherPlugin.controlFsm.SetState("Jump Slash New");
+            AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = true;
+            //AeternalEverwatcherPlugin.Instance.StartCoroutine(spawnSkProjectile());
+            yield return new WaitForSeconds(0.2f);
+            
+            AeternalEverwatcherPlugin.quadSlashing = false;
+            AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = false;
+            AeternalEverwatcherPlugin.controlFsm.SetState("Range Check");
+        }
     }
 }
