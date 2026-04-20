@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Linq;
 using BepInEx;
 using BepInEx.Logging;
@@ -57,7 +58,6 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                         foundWatcher = true;
                         break;
                 }
-
             /*HeroController.instance.OnTakenDamage += () =>
             {
                 if (!StateData.undergroundStates.Contains(controlFsm.ActiveStateName) && !pcrSlamming && !eigongAirDashing)
@@ -77,8 +77,24 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             pcrSlamming = false;
             eigongAirDashing = false;
             quadSlashing = false;
+            Instance.StartCoroutine(ModifyTerrain());
         };
         CustomBehaviour.skProjectile = ManagedAsset<GameObject>.FromNonSceneAsset("Assets/Prefabs/Hornet Enemies/Song Knight Projectile.prefab", "localpoolprefabs_assets_areahangareasong");
+    }
+
+    private static IEnumerator ModifyTerrain()
+    {
+        yield return new WaitForSeconds(0.5f);
+        Destroy(GameObject.Find("Sand Centipede Group"));
+        var terrain = GameObject.Find("TileMap Render Data").transform.GetChild(0).Find("Chunk 0 4")!;
+        var colliders = terrain.GetComponent<EdgeCollider2D>()!;
+        terrain.transform.localScale = terrain.localScale with { x = 300 };
+        terrain.transform.position = terrain.position with { x = 0 };
+        foreach (var collidersPoint in colliders.points)
+        {
+            log("x: " + collidersPoint.x);
+            log("y: " + collidersPoint.y);
+        }
     }
     public static void ResetFlags()
     {
@@ -232,6 +248,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetFirstActionOfType<SetVelocity2d>("Jump Slash Launch")!.y = 3;
 
         //* Digging & Uppercut Branch (Far Right)
+        controlFsm.GetFirstActionOfType<FloatClamp>("Dig Pos")!.minValue = 0;
         controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.3f;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 120;
 
