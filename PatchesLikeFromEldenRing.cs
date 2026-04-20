@@ -8,11 +8,17 @@ public class PatchesLikeFromEldenRing
 {
     [HarmonyPrefix]
     [HarmonyPatch(typeof(HealthManager), nameof(HealthManager.Hit))]
-    private static void HealthManager_Hit(HealthManager __instance) => __instance.invincible = AeternalEverwatcherPlugin.foundWatcher;
+    private static void HealthManager_Hit(HealthManager __instance)
+    {
+        if (!AeternalEverwatcherPlugin.foundWatcher) return;
+        __instance.invincible = true;
+    }
+
     [HarmonyPrefix]
     [HarmonyPatch(typeof(HealthManager), nameof(HealthManager.Invincible))]
     private static void HealthManager_Invincible(HealthManager __instance, HitInstance hitInstance)
     {
+        if (!AeternalEverwatcherPlugin.foundWatcher) return;
         if (!StateData.parryableStates.Contains(AeternalEverwatcherPlugin.controlFsm.ActiveStateName)) return;
         if (!__instance.gameObject.transform.root.Find("Body Damager").TryGetComponent<DamageHero>(out var damager)) return;
         AeternalEverwatcherPlugin.Instance.StartCoroutine(damager.NailClash(0, "Nail Attack", AeternalEverwatcherPlugin.transform.position));
@@ -22,6 +28,8 @@ public class PatchesLikeFromEldenRing
     [HarmonyPatch(typeof(DamageHero), nameof(DamageHero.NailClash))]
     private static void DamageHero_NailClash(DamageHero __instance)
     {
+        if (!AeternalEverwatcherPlugin.foundWatcher) return;
+        AeternalEverwatcherPlugin.parryCounter++;
         if (StateData.iframeStates.Contains(AeternalEverwatcherPlugin.controlFsm.ActiveStateName)) HeroController.instance.StartInvulnerable(0.3f);
         if (!GameManager.instance.TimeSlowed) GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
         return;
@@ -38,5 +46,4 @@ public class PatchesLikeFromEldenRing
             IsNailTag = true
         });
     }
-
 }

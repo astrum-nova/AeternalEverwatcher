@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Linq;
+using HutongGames.PlayMaker.Actions;
 using Silksong.FsmUtil;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -59,7 +60,7 @@ public static class Helpers
             if (renderer && renderer.material)
             {
                 renderer.material.color = Color.white;
-                renderer.material.SetColor(Color1, new Color(2.5f, 2.5f, 2.5f, 1f));
+                renderer.material.SetColor(Color1, new Color(2.3f, 2.3f, 2.3f, 1f));
             }
         }
     }
@@ -97,7 +98,8 @@ public static class Helpers
     }
     public static void InitSandEffects()
     {
-        var sandburstOriginal = GameObject.Find("sand_burst_effect_uppercut");
+        //var sandburstOriginal = GameObject.Find("sand_burst_effect_uppercut");
+        var sandburstOriginal = AeternalEverwatcherPlugin.controlFsm.GetLastActionOfType<ActivateGameObject>("Uppercut 1")!.gameObject.GameObject.Value;
         SandColorSetup(sandburstOriginal);
         CustomBehaviour.sandburst = Object.Instantiate(sandburstOriginal);
         CustomBehaviour.sandburst.SetActive(false);
