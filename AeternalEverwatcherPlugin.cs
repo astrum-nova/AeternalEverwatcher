@@ -86,15 +86,14 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     {
         yield return new WaitForSeconds(0.5f);
         Destroy(GameObject.Find("Sand Centipede Group"));
+        GameObject.Find("Roof Collider_Basic").SetActive(false);
+        GameObject.Find("Roof Collider_Basic (2)").SetActive(false);
+        GameObject.Find("TileMap Render Data").transform.GetChild(0).Find("Chunk 0 5").gameObject.SetActive(false);
         var terrain = GameObject.Find("TileMap Render Data").transform.GetChild(0).Find("Chunk 0 4")!;
-        var colliders = terrain.GetComponent<EdgeCollider2D>()!;
+        var stepFix = Instantiate(terrain, terrain.parent);
+        stepFix.transform.position = new Vector3(173.9688f, 3.0291f, terrain.transform.position.z);
         terrain.transform.localScale = terrain.localScale with { x = 300 };
         terrain.transform.position = terrain.position with { x = 0 };
-        foreach (var collidersPoint in colliders.points)
-        {
-            log("x: " + collidersPoint.x);
-            log("y: " + collidersPoint.y);
-        }
     }
     public static void ResetFlags()
     {
