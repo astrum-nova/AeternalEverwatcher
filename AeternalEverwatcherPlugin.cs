@@ -23,9 +23,9 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     public static void log(string msg) => logger.LogInfo(msg);
     public static AeternalEverwatcherPlugin Instance { get; set; } = null!;
 
-    public static bool PHASE_2 = true;
-    public static bool PHASE_3 = true;
-    public static int PHASE_2_QUOTA = 1;
+    public static bool PHASE_2;
+    public static bool PHASE_3;
+    public static int PHASE_2_QUOTA = 25;
     public static int PHASE_3_QUOTA = 75;
     public static int END_FIGHT_QUOTA = 160;
     public static int parryCounter;
@@ -45,6 +45,10 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         Instance = this;
         Logger.LogInfo($"Plugin {Name} ({Id}) has loaded!");
         Harmony.CreateAndPatchAll(typeof(PatchesLikeFromEldenRing));
+        Settings.SetupSettings(Config);
+        PHASE_2_QUOTA = Settings.PHASE_2_QUOTA;
+        PHASE_3_QUOTA = Settings.PHASE_3_QUOTA;
+        END_FIGHT_QUOTA = Settings.END_FIGHT_QUOTA;
         SceneManager.sceneLoaded += (scene, _) =>
         {
             if (!scene.name.Equals("Coral_39")) return;
@@ -137,6 +141,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             "bone_deep_0170_t (15)",
             "bone_deep_0170_t (13)",
         ];
+        //todo refactor this with maybe a whitelist.any(x => x.startswith(rootgo.name))
         foreach (var rootGameObject in SceneManager.GetActiveScene().GetRootGameObjects()) if ((
             rootGameObject.name.StartsWith("kingdom_gate_0000_sand_dune_ground")
             || rootGameObject.name.StartsWith("bone_deep")
@@ -145,9 +150,11 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         {
             var newAsset = Instantiate(rootGameObject, terrainExtension1.transform);
             var objX = rootGameObject.transform.position.x;
+            //? 108 is the pivot, -10 is the average length of the asset im copying, should prolly make a switch for each type of thing for modularity but eh it works
             var offsetFromCenter = objX - 108 - 10;
             newAsset.transform.position = rootGameObject.transform.position with { x = objX - offsetFromCenter * 2};
             var newAssetFar = Instantiate(rootGameObject, terrainExtension2.transform);
+            //? -54 offset for further left shift
             newAssetFar.transform.position = rootGameObject.transform.position with { x = objX - offsetFromCenter * 2 - 54};
         }
     }

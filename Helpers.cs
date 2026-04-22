@@ -60,8 +60,27 @@ public static class Helpers
             if (renderer && renderer.material)
             {
                 renderer.material.color = Color.white;
-                renderer.material.SetColor(Color1, new Color(2.3f, 2.3f, 2.3f, 1f));
+                switch (pt.name)
+                {
+                    case "sand_burst  back":
+                        renderer.material.SetColor(Color1, new Color(Settings.SAND_EFFECTS_BRIGHTNESS * 2, Settings.SAND_EFFECTS_BRIGHTNESS * 2, Settings.SAND_EFFECTS_BRIGHTNESS * 2, 1f));
+                        break;
+                    case "sand_burst front":
+                        renderer.material.SetColor(Color1, new Color(Settings.SAND_EFFECTS_BRIGHTNESS * 2.2f, Settings.SAND_EFFECTS_BRIGHTNESS * 2.2f, Settings.SAND_EFFECTS_BRIGHTNESS * 2.2f, 0.3f));
+                        if (!Settings.BOSS_AND_PLAYER_ABOVE_SAND) renderer.sortingOrder = 2000;
+                        break;
+                    default:
+                        renderer.material.SetColor(Color1, new Color(Settings.SAND_EFFECTS_BRIGHTNESS * 2f, Settings.SAND_EFFECTS_BRIGHTNESS * 2f, Settings.SAND_EFFECTS_BRIGHTNESS * 2f, 1f));
+                        break;
+                }
             }
+            var noise = pt.noise;
+            noise.enabled = true;
+            noise.separateAxes = false;
+            noise.strength = 1.0f;
+            noise.frequency = 0.2f;
+            noise.scrollSpeed = 0.2f;
+            noise.quality = ParticleSystemNoiseQuality.Low;
         }
     }
     public static void SandSpeedSetup(GameObject wave, float velLimit = 2.0f)
@@ -81,6 +100,7 @@ public static class Helpers
         damagerHitboxOriginal.SetPath(0, points);
         foreach (var pt in wave.GetComponentsInChildren<ParticleSystem>(true))
         {
+            //if (pt.name == "sand_burst front") Object.Instantiate(pt, pt.gameObject.transform.parent);
             var shape = pt.shape;
             shape.scale = new Vector3(6, 0.1f, 1);
             var emission = pt.emission;
