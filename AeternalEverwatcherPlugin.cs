@@ -25,7 +25,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
 
     public static bool PHASE_2 = true;
     public static bool PHASE_3 = true;
-    public static int PHASE_2_QUOTA = 25;
+    public static int PHASE_2_QUOTA = 1;
     public static int PHASE_3_QUOTA = 75;
     public static int END_FIGHT_QUOTA = 160;
     public static int parryCounter;
@@ -56,6 +56,13 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                         controlFsm = fsm;
                         healthManager = fsm.GetComponent<HealthManager>();
                         transform = fsm.gameObject.transform;
+                        log("BOSS RENDER LAYER:");
+                        transform.gameObject.GetComponentInChildren<tk2dSprite>().renderLayer = 200;
+                        foreach (var componentsInChild in HeroController.instance.GetComponentsInChildren<tk2dSprite>())
+                        {
+                            componentsInChild.renderLayer = 500;
+                        }
+                        
                         foundWatcher = true;
                         break;
                 }
