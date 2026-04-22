@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using BepInEx;
 using BepInEx.Logging;
@@ -81,19 +82,67 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         };
         CustomBehaviour.skProjectile = ManagedAsset<GameObject>.FromNonSceneAsset("Assets/Prefabs/Hornet Enemies/Song Knight Projectile.prefab", "localpoolprefabs_assets_areahangareasong");
     }
-
     private static IEnumerator ModifyTerrain()
     {
         yield return new WaitForSeconds(0.5f);
-        Destroy(GameObject.Find("Sand Centipede Group"));
+        //? Boss aggro range, extended to the far left edges of the scene
+        var battleRange = GameObject.Find("Battle Range");
+        battleRange.transform.position = battleRange.transform.position with { x = 75.2f };
+        battleRange.transform.localScale = battleRange.transform.localScale with { x = 1.372f };
+        //? Room transition trigger, extended higher up
+        var roomTrans = GameObject.Find("right1");
+        roomTrans.transform.localScale = roomTrans.transform.localScale with { y = 10 };
+        //? Camera triggers modified to fit the extended arena, otherwise they will point down at the sand sea
+        var camlock4 = GameObject.Find("CameraLockArea (4)");
+        camlock4.transform.position = camlock4.transform.position with { x = 81 };
+        camlock4.transform.localScale = camlock4.transform.localScale with { x = 7 };
+        GameObject.Find("CameraLockArea (5)").SetActive(false);
+        //? Terrain colliders that must be disabled
+        GameObject.Find("terrain collider non slider").SetActive(false);
+        GameObject.Find("terrain collider non slider (1)").SetActive(false);
+        GameObject.Find("terrain collider non slider (2)").SetActive(false);
+        GameObject.Find("terrain collider non slider (3)").SetActive(false);
+        GameObject.Find("terrain collider (13)").SetActive(false);
+        GameObject.Find("terrain collider (12)").SetActive(false);
+        GameObject.Find("terrain collider (11)").SetActive(false);
+        GameObject.Find("terrain collider (10)").SetActive(false);
         GameObject.Find("Roof Collider_Basic").SetActive(false);
         GameObject.Find("Roof Collider_Basic (2)").SetActive(false);
-        GameObject.Find("TileMap Render Data").transform.GetChild(0).Find("Chunk 0 5").gameObject.SetActive(false);
-        var terrain = GameObject.Find("TileMap Render Data").transform.GetChild(0).Find("Chunk 0 4")!;
-        var stepFix = Instantiate(terrain, terrain.parent);
-        stepFix.transform.position = new Vector3(173.9688f, 3.0291f, terrain.transform.position.z);
+        var tilemapRenderData = GameObject.Find("TileMap Render Data").transform.GetChild(0)!;
+        foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 5").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
+        foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 4").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
+        foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 3").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
+        foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 0 5").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
+        var terrain = tilemapRenderData.Find("Chunk 0 4")!;
         terrain.transform.localScale = terrain.localScale with { x = 300 };
         terrain.transform.position = terrain.position with { x = 0 };
+        var stepFix = Instantiate(terrain, terrain.parent);
+        stepFix.transform.position = new Vector3(173.9688f, 3.0291f, terrain.transform.position.z);
+        var terrainExtension1 = new GameObject("Terrain Extension 1");
+        var terrainExtension2 = new GameObject("Terrain Extension 2");
+        HashSet<string> assetBlacklist =
+        [
+            "kingdom_gate_0000_sand_dune_ground (28)",
+            "kingdom_gate_0000_sand_dune_ground (19)",
+            "bone_deep_0170_t (14)",
+            "bone_deep_0170_t (12)",
+            "bone_deep_0170_t (16)",
+            "bone_deep_0170_t (15)",
+            "bone_deep_0170_t (13)",
+        ];
+        foreach (var rootGameObject in SceneManager.GetActiveScene().GetRootGameObjects()) if ((
+            rootGameObject.name.StartsWith("kingdom_gate_0000_sand_dune_ground")
+            || rootGameObject.name.StartsWith("bone_deep")
+            || rootGameObject.name.StartsWith("Bone_floor_02")
+            ) && !assetBlacklist.Contains(rootGameObject.name))
+        {
+            var newAsset = Instantiate(rootGameObject, terrainExtension1.transform);
+            var objX = rootGameObject.transform.position.x;
+            var offsetFromCenter = objX - 108 - 10;
+            newAsset.transform.position = rootGameObject.transform.position with { x = objX - offsetFromCenter * 2};
+            var newAssetFar = Instantiate(rootGameObject, terrainExtension2.transform);
+            newAssetFar.transform.position = rootGameObject.transform.position with { x = objX - offsetFromCenter * 2 - 54};
+        }
     }
     public static void ResetFlags()
     {
@@ -102,7 +151,6 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         fiveSLashedOnce = false;
         eigongAirDashing = false;
     }
-
     public static bool PhaseCheck()
     {
         if (fiveSLash || eigongAirDashing || pcrSlamming || quadSlashing) return false;
@@ -275,7 +323,11 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             if (PHASE_2) Instance.StartCoroutine(CustomBehaviour.SpawnSandWave());
             if (!pcrSlamming && PHASE_3) Instance.StartCoroutine(CustomBehaviour.PCRSlams());
         });
-        controlFsm.GetState("Uppercut End")!.AddLambdaMethod(_ => controlFsm.SetState("Uppercut Launch"));
+        controlFsm.GetState("Uppercut End")!.AddLambdaMethod(_ =>
+        {
+            controlFsm.GetFirstActionOfType<FloatClamp>("Uppercut Launch")!.minValue = 0;
+            controlFsm.SetState("Uppercut Launch");
+        });
     }
     private void Update()
     {
