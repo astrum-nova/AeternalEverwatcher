@@ -161,11 +161,12 @@ public static class Helpers
         camlock4.transform.position = camlock4.transform.position with { x = 81 };
         camlock4.transform.localScale = camlock4.transform.localScale with { x = 7 };
         GameObject.Find("CameraLockArea (5)").SetActive(false);
-        //? Terrain colliders that must be disabled
+        //? Disable centipedes on the left edge since theyre useless with the arena extension
         GameObject.Find("sand_centipede_scuffle").SetActive(false);
         GameObject.Find("Sand Centipede Hero Damager").SetActive(false);
         GameObject.Find("Sand Centipede Group").SetActive(false);
         GameObject.Find("Sand_Centipede_Ambient_Audio Variant").SetActive(false);
+        //? Terrain colliders that must be disabled
         GameObject.Find("terrain collider non slider").SetActive(false);
         GameObject.Find("terrain collider non slider (1)").SetActive(false);
         GameObject.Find("terrain collider non slider (2)").SetActive(false);
@@ -176,10 +177,12 @@ public static class Helpers
         GameObject.Find("terrain collider (10)").SetActive(false);
         GameObject.Find("Roof Collider_Basic").SetActive(false);
         GameObject.Find("Roof Collider_Basic (2)").SetActive(false);
+        //? Theres a fuckass hole in the roof for some reason this oughta fix it 
         var roofFiller = Object.Instantiate(GameObject.Find("Giant_Conch_bg_horn (23)"));
         roofFiller.transform.localScale = new Vector3(4.3223f, 5.3747f, 1);
         roofFiller.transform.position = new Vector3(159.4092f, 45.6818f, -5.1127f);
         roofFiller.transform.SetRotation2D(338.352f);
+        //? Disable the colliders from the tilemap but keep the black rectangles to fill
         var tilemapRenderData = GameObject.Find("TileMap Render Data").transform.GetChild(0)!;
         foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 5").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
         foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 4").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
@@ -190,8 +193,15 @@ public static class Helpers
         terrain.transform.position = terrain.position with { x = 0 };
         var stepFix = Object.Instantiate(terrain, terrain.parent);
         stepFix.transform.position = new Vector3(173.9688f, 3.0291f, terrain.transform.position.z);
+        //? Copy over art assets to cover the extended ground
         var terrainExtension1 = new GameObject("Terrain Extension 1");
         var terrainExtension2 = new GameObject("Terrain Extension 2");
+        HashSet<string> whiteList =
+        [
+            "kingdom_gate_0000_sand_dune_ground",
+            "bone_deep",
+            "Bone_floor_02"
+        ];
         HashSet<string> assetBlacklist =
         [
             "kingdom_gate_0000_sand_dune_ground (28)",
@@ -202,12 +212,7 @@ public static class Helpers
             "bone_deep_0170_t (15)",
             "bone_deep_0170_t (13)",
         ];
-        //todo refactor this with maybe a whitelist.any(x => x.startswith(rootgo.name))
-        foreach (var rootGameObject in SceneManager.GetActiveScene().GetRootGameObjects()) if ((
-            rootGameObject.name.StartsWith("kingdom_gate_0000_sand_dune_ground")
-            || rootGameObject.name.StartsWith("bone_deep")
-            || rootGameObject.name.StartsWith("Bone_floor_02")
-            ) && !assetBlacklist.Contains(rootGameObject.name))
+        foreach (var rootGameObject in SceneManager.GetActiveScene().GetRootGameObjects()) if (whiteList.Any(assetName => rootGameObject.name.StartsWith(assetName)) && !assetBlacklist.Contains(rootGameObject.name))
         {
             var newAsset = Object.Instantiate(rootGameObject, terrainExtension1.transform);
             var objX = rootGameObject.transform.position.x;
