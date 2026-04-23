@@ -4,6 +4,7 @@ namespace AeternalEverwatcher;
 
 public static class Settings
 {
+    public static bool ON_DAMAGE_FREEZE = true;
     public static float SAND_EFFECTS_BRIGHTNESS = 1;
     public static bool BOSS_AND_PLAYER_ABOVE_SAND;
     public static float PARRY_TIME_FREEZE = -1;
@@ -29,6 +30,12 @@ public static class Settings
             "Parry Time Freeze",
             -1f,
             "Use this to change the parry time freeze, set it to 0 to disable it entirely, or leave it at -1 to use the default time freeze. Must be greater than or equal 0 and less than or equal 0.261."
+        ).Value;
+        ON_DAMAGE_FREEZE = Config.Bind(
+            "Accessibility",
+            "On Damage Freeze",
+            true,
+            "This setting should help you keep the rhythm your even when taking damage."
         ).Value;
         PHASE_2_QUOTA = Config.Bind(
             "Bossfight Settings",

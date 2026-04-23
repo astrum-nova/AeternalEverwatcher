@@ -5,6 +5,7 @@ using BepInEx;
 using BepInEx.Logging;
 using GlobalEnums;
 using HarmonyLib;
+using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
 using Silksong.AssetHelper.ManagedAssets;
 using Silksong.FsmUtil;
@@ -39,6 +40,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     public static bool pcrSlamming;
     public static bool eigongAirDashing;
     public static bool quadSlashing;
+    public static bool tookDamage;
 
     private void Awake()
     {
@@ -52,6 +54,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         SceneManager.sceneLoaded += (scene, _) =>
         {
             if (!scene.name.Equals("Coral_39")) return;
+            foundWatcher = false;
             foreach (var fsm in FindObjectsByType<PlayMakerFSM>(FindObjectsSortMode.None)!.Where(fsm => fsm.name.Equals("Coral Warrior Grey")))
                 switch (fsm.FsmName)
                 {
@@ -60,24 +63,19 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                         controlFsm = fsm;
                         healthManager = fsm.GetComponent<HealthManager>();
                         transform = fsm.gameObject.transform;
-                        log("BOSS RENDER LAYER:");
                         transform.gameObject.GetComponentInChildren<tk2dSprite>().renderLayer = 200;
-                        foreach (var componentsInChild in HeroController.instance.GetComponentsInChildren<tk2dSprite>())
-                        {
-                            componentsInChild.renderLayer = 500;
-                        }
-                        
+                        foreach (var componentsInChild in HeroController.instance.GetComponentsInChildren<tk2dSprite>()) componentsInChild.renderLayer = 500;
                         foundWatcher = true;
                         break;
                 }
-            /*HeroController.instance.OnTakenDamage += () =>
+            //todo maybe freeze when taking damage, add a setting for it
+            HeroController.instance.OnTakenDamage += () =>
             {
-                if (!StateData.undergroundStates.Contains(controlFsm.ActiveStateName) && !pcrSlamming && !eigongAirDashing)
-                {
-                    controlFsm.SetState("Dig In 1");
-                    ResetFlags();
-                }
-            };*/
+                tookDamage = true;
+                if (!Settings.ON_DAMAGE_FREEZE) return;
+                if (Settings.PARRY_TIME_FREEZE >= 0 && Settings.PARRY_TIME_FREEZE <= 0.261f) Instance.StartCoroutine(GameManager.instance.FreezeMoment(0.01f, Settings.PARRY_TIME_FREEZE - 0.11f, 0.1f, 0f));
+                else GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
+            };
             ResetFlags();
             SetupWatcher();
             PHASE_2 = false;
@@ -89,74 +87,9 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             pcrSlamming = false;
             eigongAirDashing = false;
             quadSlashing = false;
-            Instance.StartCoroutine(ModifyTerrain());
+            Instance.StartCoroutine(Helpers.ModifyTerrain());
         };
         CustomBehaviour.skProjectile = ManagedAsset<GameObject>.FromNonSceneAsset("Assets/Prefabs/Hornet Enemies/Song Knight Projectile.prefab", "localpoolprefabs_assets_areahangareasong");
-    }
-    private static IEnumerator ModifyTerrain()
-    {
-        yield return new WaitForSeconds(0.5f);
-        //? Boss aggro range, extended to the far left edges of the scene
-        var battleRange = GameObject.Find("Battle Range");
-        battleRange.transform.position = battleRange.transform.position with { x = 75.2f };
-        battleRange.transform.localScale = battleRange.transform.localScale with { x = 1.372f };
-        //? Room transition trigger, extended higher up
-        var roomTrans = GameObject.Find("right1");
-        roomTrans.transform.localScale = roomTrans.transform.localScale with { y = 10 };
-        //? Camera triggers modified to fit the extended arena, otherwise they will point down at the sand sea
-        var camlock4 = GameObject.Find("CameraLockArea (4)");
-        camlock4.transform.position = camlock4.transform.position with { x = 81 };
-        camlock4.transform.localScale = camlock4.transform.localScale with { x = 7 };
-        GameObject.Find("CameraLockArea (5)").SetActive(false);
-        //? Terrain colliders that must be disabled
-        GameObject.Find("terrain collider non slider").SetActive(false);
-        GameObject.Find("terrain collider non slider (1)").SetActive(false);
-        GameObject.Find("terrain collider non slider (2)").SetActive(false);
-        GameObject.Find("terrain collider non slider (3)").SetActive(false);
-        GameObject.Find("terrain collider (13)").SetActive(false);
-        GameObject.Find("terrain collider (12)").SetActive(false);
-        GameObject.Find("terrain collider (11)").SetActive(false);
-        GameObject.Find("terrain collider (10)").SetActive(false);
-        GameObject.Find("Roof Collider_Basic").SetActive(false);
-        GameObject.Find("Roof Collider_Basic (2)").SetActive(false);
-        var tilemapRenderData = GameObject.Find("TileMap Render Data").transform.GetChild(0)!;
-        foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 5").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
-        foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 4").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
-        foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 3").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
-        foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 0 5").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
-        var terrain = tilemapRenderData.Find("Chunk 0 4")!;
-        terrain.transform.localScale = terrain.localScale with { x = 300 };
-        terrain.transform.position = terrain.position with { x = 0 };
-        var stepFix = Instantiate(terrain, terrain.parent);
-        stepFix.transform.position = new Vector3(173.9688f, 3.0291f, terrain.transform.position.z);
-        var terrainExtension1 = new GameObject("Terrain Extension 1");
-        var terrainExtension2 = new GameObject("Terrain Extension 2");
-        HashSet<string> assetBlacklist =
-        [
-            "kingdom_gate_0000_sand_dune_ground (28)",
-            "kingdom_gate_0000_sand_dune_ground (19)",
-            "bone_deep_0170_t (14)",
-            "bone_deep_0170_t (12)",
-            "bone_deep_0170_t (16)",
-            "bone_deep_0170_t (15)",
-            "bone_deep_0170_t (13)",
-        ];
-        //todo refactor this with maybe a whitelist.any(x => x.startswith(rootgo.name))
-        foreach (var rootGameObject in SceneManager.GetActiveScene().GetRootGameObjects()) if ((
-            rootGameObject.name.StartsWith("kingdom_gate_0000_sand_dune_ground")
-            || rootGameObject.name.StartsWith("bone_deep")
-            || rootGameObject.name.StartsWith("Bone_floor_02")
-            ) && !assetBlacklist.Contains(rootGameObject.name))
-        {
-            var newAsset = Instantiate(rootGameObject, terrainExtension1.transform);
-            var objX = rootGameObject.transform.position.x;
-            //? 108 is the pivot, -10 is the average length of the asset im copying, should prolly make a switch for each type of thing for modularity but eh it works
-            var offsetFromCenter = objX - 108 - 10;
-            newAsset.transform.position = rootGameObject.transform.position with { x = objX - offsetFromCenter * 2};
-            var newAssetFar = Instantiate(rootGameObject, terrainExtension2.transform);
-            //? -54 offset for further left shift
-            newAssetFar.transform.position = rootGameObject.transform.position with { x = objX - offsetFromCenter * 2 - 54};
-        }
     }
     public static void ResetFlags()
     {
@@ -164,56 +97,53 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         fiveSLash = false;
         fiveSLashedOnce = false;
         eigongAirDashing = false;
+        tookDamage = false;
     }
     public static bool PhaseCheck()
     {
         if (fiveSLash || eigongAirDashing || pcrSlamming || quadSlashing) return false;
-        var phaseChanged = false;
         if (parryCounter >= PHASE_2_QUOTA && !PHASE_2 && CustomBehaviour.groundWave && CustomBehaviour.pcrBurst && CustomBehaviour.sandburst && CustomBehaviour.sandburstSmall)
         {
             parryCounter = PHASE_2_QUOTA;
             ResetFlags();
             PHASE_2 = true;
             controlFsm.SetState("Stun Start");
-            phaseChanged = true;
+            return true;
         }
 
-        if (parryCounter >= PHASE_3_QUOTA && !PHASE_3)
+        if (parryCounter >= PHASE_3_QUOTA && !PHASE_3 && PHASE_2)
         {
             parryCounter = PHASE_3_QUOTA;
             ResetFlags();
             PHASE_3 = true;
             controlFsm.SetState("Stun Start");
-            phaseChanged = true;
+            return true;
         }
-
-        if (parryCounter >= END_FIGHT_QUOTA && PHASE_2 && PHASE_3)
-        {
-            ResetFlags();
-            healthManager.TakeDamage(new HitInstance
-            {
-                Source = HeroController.instance.gameObject,
-                AttackType = AttackTypes.Spell,
-                DamageDealt = 3000,
-                Direction = 0,
-                Multiplier = 1f,
-                MagnitudeMultiplier = 1f,
-                IgnoreInvulnerable = true,
-                HitEffectsType = EnemyHitEffectsProfile.EffectsTypes.Full,
-                IsNailTag = true
-            });
-            phaseChanged = true;
-        }
-
-        return phaseChanged;
+        return false;
     }
     private static void SetupWatcher()
     {
         //* Initialization & Intro (Top Center)
+        controlFsm.GetState("Stun Recover")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()));
+        controlFsm.GetState("Stunned")!.AddAction(new ObjectJitter
+        {
+            gameObject = new FsmOwnerDefault
+            {
+                ownerOption = OwnerDefaultOption.UseOwner,
+                OwnerOption = OwnerDefaultOption.UseOwner,
+                gameObject = transform.gameObject,
+                GameObject = transform.gameObject
+            },
+            x = 0.2f,
+            y = 0.2f,
+            z = 0,
+            allowMovement = false,
+            limitFps = 30,
+        });
         controlFsm.GetFirstActionOfType<StartRoarEmitter>("Wake Roar 2")!.stunHero = false;
         controlFsm.GetFirstActionOfType<Wait>("Wake Roar 2")!.time = 0.5f;
         controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 0;
-
+        
         //* Neutral & Range Checking (Middle Section)
         controlFsm.GetFirstActionOfType<Wait>("Init Idle")!.time = 0.3f;
         controlFsm.GetFirstActionOfType<Wait>("Idle")!.time = 0;
@@ -343,11 +273,9 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             controlFsm.SetState("Uppercut Launch");
         });
     }
+
     private void Update()
     {
-        try
-        {
-            HeroController.instance.MaxHealth();
-        } catch {/*ignored*/}
+        if (foundWatcher) HeroController.instance.MaxHealth();
     }
 }

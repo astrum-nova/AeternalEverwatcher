@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections;
 using GlobalEnums;
 using HarmonyLib;
-using UnityEngine;
 
 namespace AeternalEverwatcher;
 
@@ -48,18 +46,21 @@ public class PatchesLikeFromEldenRing
         if (StateData.iframeStates.Contains(AeternalEverwatcherPlugin.controlFsm.ActiveStateName)) HeroController.instance.StartInvulnerable(0.3f);
         if (!GameManager.instance.TimeSlowed) GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
         AeternalEverwatcherPlugin.healthManager.SpriteFlash.flashArmoured();
-        return;
-        if (__instance == null) return;
-        AeternalEverwatcherPlugin.healthManager.TakeDamage(new HitInstance
+        if (AeternalEverwatcherPlugin.parryCounter >= AeternalEverwatcherPlugin.END_FIGHT_QUOTA && AeternalEverwatcherPlugin.PHASE_2 && AeternalEverwatcherPlugin.PHASE_3)
         {
-            Source = HeroController.instance.gameObject,
-            AttackType = AttackTypes.Nail,
-            DamageDealt = PlayerData.instance.nailDamage,
-            Direction = 270,
-            Multiplier = 1f,
-            MagnitudeMultiplier = 1f,
-            IgnoreInvulnerable = true,
-            IsNailTag = true
-        });
+            AeternalEverwatcherPlugin.ResetFlags();
+            AeternalEverwatcherPlugin.healthManager.TakeDamage(new HitInstance
+            {
+                Source = HeroController.instance.gameObject,
+                AttackType = AttackTypes.Spell,
+                DamageDealt = 3000,
+                Direction = 0,
+                Multiplier = 1f,
+                MagnitudeMultiplier = 1f,
+                IgnoreInvulnerable = true,
+                HitEffectsType = EnemyHitEffectsProfile.EffectsTypes.Full,
+                IsNailTag = true
+            });
+        }
     }
 }
