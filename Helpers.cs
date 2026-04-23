@@ -224,5 +224,7 @@ public static class Helpers
             newAssetFar.transform.position = rootGameObject.transform.position with { x = objX - offsetFromCenter * 2 - 54};
         }
     }
-    private static readonly int Color1 = Shader.PropertyToID("_Color");
+
+    public static void SetSpearX(GameObject spear, float x) => spear.transform.position = spear.transform.position with { x = x };
+    public static readonly int Color1 = Shader.PropertyToID("_Color");
 }

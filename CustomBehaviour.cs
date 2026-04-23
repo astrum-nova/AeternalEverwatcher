@@ -15,6 +15,8 @@ public static class CustomBehaviour
     private const float WINDSLASH_DEFAULT_Y = 7.327499f;
     public static ManagedAsset<GameObject> skProjectile = null!;
     public static GameObject skProjectileSetup = null!;
+    public static ManagedAsset<GameObject> khannUcSpear = null!;
+    public static GameObject khannUcSpearSetup = null!;
     public static GameObject groundWave = null!;
     public static GameObject pcrBurst = null!;
     public static GameObject sandburst = null!;
@@ -215,5 +217,109 @@ public static class CustomBehaviour
             AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = false;
             AeternalEverwatcherPlugin.controlFsm.SetState("Range Check");
         }
+    }
+    public static IEnumerator DesperationSpears()
+    {
+        yield return new WaitForSeconds(2f);
+        GameObject.Find("Corpse Coral Warrior Grey(Clone)").GetComponent<PlayMakerFSM>().GetFirstActionOfType<StartRoarEmitter>("Roar")!.noVisualEffect = true;
+        arenaBorderLeft.transform.position = arenaBorderLeft.transform.position with { x = HeroController.instance.transform.position.x + 30 };
+        arenaBorderRight.transform.position = arenaBorderRight.transform.position with { x = HeroController.instance.transform.position.x - 30 };
+        for (var i = 0; i < 2000; i++)
+        {
+            yield return new WaitForSeconds(0.3f);
+            var spear = Object.Instantiate(khannUcSpearSetup);
+            var spearLeft = Object.Instantiate(khannUcSpearSetup);
+            spear.transform.SetRotation2D(Random.Range(-30, 30));
+            spearLeft.transform.SetRotation2D(Random.Range(-30, 30));
+            Helpers.SetSpearX(spear, HeroController.instance.transform.position.x + Random.Range(-10, 10) + 9);
+            Helpers.SetSpearX(spearLeft, HeroController.instance.transform.position.x - 16 + 9 + Random.Range(-6, 6) * Random.Range(0, 2) == 0 ? 1 : -1);
+            spear.SetActive(true);
+            spear.transform.GetChild(0).gameObject.SetActive(true);
+            spearLeft.SetActive(true);
+            spearLeft.transform.GetChild(0).gameObject.SetActive(true);
+        }
+        yield return new WaitForSeconds(1f);
+        AeternalEverwatcherPlugin.Instance.StartCoroutine(ArenaBorders(false));
+    }
+    private static GameObject arenaBorderLeft;
+    private static GameObject arenaBorderRight;
+    public static IEnumerator ArenaBorders(bool createOrDestroy)
+    {
+        if (!khannUcSpearSetup)
+        {
+            yield return khannUcSpear.Load();
+            khannUcSpearSetup = khannUcSpear.InstantiateAsset();
+            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<SpriteRenderer>(true)) componentsInChild.color = new Color(0.5f, 1f, 1f, 1);
+            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<ParticleSystemRenderer>(true)) componentsInChild.material.SetColor(Helpers.Color1, new Color(0.6f, 0.8f, 0.8f, 1));
+            khannUcSpearSetup.SetActive(false);
+            left1 = Object.Instantiate(khannUcSpearSetup, AeternalEverwatcherPlugin.transform);
+            left2 = Object.Instantiate(khannUcSpearSetup, AeternalEverwatcherPlugin.transform);
+            right1 = Object.Instantiate(khannUcSpearSetup, AeternalEverwatcherPlugin.transform);
+            right2 = Object.Instantiate(khannUcSpearSetup, AeternalEverwatcherPlugin.transform);
+            right1.transform.localScale = right1.transform.localScale with { x = right1.transform.localScale.x * -1 };
+            right2.transform.localScale = right2.transform.localScale with { x = right2.transform.localScale.x * -1 };
+            left1.SetActive(false);
+            left2.SetActive(false);
+            right1.SetActive(false);
+            right2.SetActive(false);
+            left1.name = "StunLeft1";
+            left2.name = "StunLeft2";
+            right1.name = "StunRight1";
+            right2.name = "StunRight2";
+            arenaBorderLeft = Object.Instantiate(khannUcSpearSetup);
+            arenaBorderRight = Object.Instantiate(khannUcSpearSetup);
+            arenaBorderLeft.transform.localScale = new Vector3(2, 3, -1);
+            arenaBorderRight.transform.localScale = new Vector3(2, 3, 1);
+            arenaBorderLeft.name = "ArenaBorderLeft";
+            arenaBorderRight.name = "ArenaBorderRight";
+        }
+        if (createOrDestroy)
+        {
+            arenaBorderLeft.SetActive(true);
+            arenaBorderRight.SetActive(true);
+            arenaBorderLeft.transform.GetChild(0).gameObject.SetActive(true);
+            arenaBorderRight.transform.GetChild(0).gameObject.SetActive(true);
+            yield return new WaitForSeconds(1f);
+            arenaBorderLeft.transform.position = new Vector3(23, 140, 0);
+            arenaBorderRight.transform.position = new Vector3(168.9436f, 140, 2);
+            var spearObjLeft = arenaBorderLeft.transform.GetChild(0); 
+            var spearObjRight = arenaBorderRight.transform.GetChild(0); 
+            spearObjLeft.GetComponent<Animator>().enabled = false;
+            spearObjLeft.GetComponent<DeactivateAfterDelay>().enabled = false;
+            spearObjRight.GetComponent<Animator>().enabled = false;
+            spearObjRight.GetComponent<DeactivateAfterDelay>().enabled = false;
+            spearObjLeft.GetChild(1).GetChild(0).gameObject.SetActive(false);
+            spearObjRight.GetChild(1).GetChild(0).gameObject.SetActive(false);
+            spearObjLeft.GetChild(1).GetChild(1).gameObject.SetActive(true);
+            spearObjRight.GetChild(1).GetChild(1).gameObject.SetActive(true);
+            spearObjLeft.GetChild(1).gameObject.AddComponent<NonBouncer>();
+            spearObjRight.GetChild(1).GetChild(3).gameObject.AddComponent<NonBouncer>();
+            spearObjLeft.GetChild(1).GetChild(3).gameObject.AddComponent<NonBouncer>();
+        }
+        else
+        {
+            arenaBorderLeft.transform.GetChild(0).GetComponent<Animator>().enabled = true;
+            arenaBorderLeft.transform.GetChild(0).GetComponent<DeactivateAfterDelay>().enabled = true;
+            arenaBorderRight.transform.GetChild(0).GetComponent<Animator>().enabled = true;
+            arenaBorderRight.transform.GetChild(0).GetComponent<DeactivateAfterDelay>().enabled = true;
+        }
+    }
+    private static GameObject left1;
+    private static GameObject left2;
+    private static GameObject right1;
+    private static GameObject right2;
+    public static IEnumerator StunSpears()
+    {
+        Helpers.SetSpearX(left2, AeternalEverwatcherPlugin.transform.position.x - 6 * AeternalEverwatcherPlugin.transform.localScale.x);
+        Helpers.SetSpearX(right2, AeternalEverwatcherPlugin.transform.position.x + 6 * AeternalEverwatcherPlugin.transform.localScale.x);
+        left1.SetActive(true);
+        left2.SetActive(true);
+        right1.SetActive(true);
+        right2.SetActive(true);
+        left1.transform.GetChild(0).gameObject.SetActive(true);
+        right1.transform.GetChild(0).gameObject.SetActive(true);
+        yield return new WaitForSeconds(0.15f);
+        left2.transform.GetChild(0).gameObject.SetActive(true);
+        right2.transform.GetChild(0).gameObject.SetActive(true);
     }
 }

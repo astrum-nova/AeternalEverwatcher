@@ -46,6 +46,7 @@ public class PatchesLikeFromEldenRing
         if (StateData.iframeStates.Contains(AeternalEverwatcherPlugin.controlFsm.ActiveStateName)) HeroController.instance.StartInvulnerable(0.3f);
         if (!GameManager.instance.TimeSlowed) GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
         AeternalEverwatcherPlugin.healthManager.SpriteFlash.flashArmoured();
+        HeroController.instance.AddSilk(1, false);
         if (AeternalEverwatcherPlugin.parryCounter >= AeternalEverwatcherPlugin.END_FIGHT_QUOTA && AeternalEverwatcherPlugin.PHASE_2 && AeternalEverwatcherPlugin.PHASE_3)
         {
             AeternalEverwatcherPlugin.ResetFlags();
