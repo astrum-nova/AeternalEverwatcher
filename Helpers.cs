@@ -176,6 +176,10 @@ public static class Helpers
         GameObject.Find("terrain collider (10)").SetActive(false);
         GameObject.Find("Roof Collider_Basic").SetActive(false);
         GameObject.Find("Roof Collider_Basic (2)").SetActive(false);
+        var roofFiller = Object.Instantiate(GameObject.Find("Giant_Conch_bg_horn (23)"));
+        roofFiller.transform.localScale = new Vector3(4.3223f, 5.3747f, 1);
+        roofFiller.transform.position = new Vector3(159.4092f, 45.6818f, -5.1127f);
+        roofFiller.transform.SetRotation2D(338.352f);
         var tilemapRenderData = GameObject.Find("TileMap Render Data").transform.GetChild(0)!;
         foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 5").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
         foreach (var edgeCollider2D in tilemapRenderData.Find("Chunk 1 4").gameObject.GetComponents<EdgeCollider2D>()) edgeCollider2D.enabled = false;
