@@ -162,6 +162,10 @@ public static class Helpers
         camlock4.transform.localScale = camlock4.transform.localScale with { x = 7 };
         GameObject.Find("CameraLockArea (5)").SetActive(false);
         //? Terrain colliders that must be disabled
+        GameObject.Find("sand_centipede_scuffle").SetActive(false);
+        GameObject.Find("Sand Centipede Hero Damager").SetActive(false);
+        GameObject.Find("Sand Centipede Group").SetActive(false);
+        GameObject.Find("Sand_Centipede_Ambient_Audio Variant").SetActive(false);
         GameObject.Find("terrain collider non slider").SetActive(false);
         GameObject.Find("terrain collider non slider (1)").SetActive(false);
         GameObject.Find("terrain collider non slider (2)").SetActive(false);
