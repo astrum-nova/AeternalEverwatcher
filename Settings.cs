@@ -5,12 +5,14 @@ namespace AeternalEverwatcher;
 public static class Settings
 {
     public static bool ON_DAMAGE_FREEZE = true;
+    public static bool DISABLE_WIND_EFFECTS = true;
     public static float SAND_EFFECTS_BRIGHTNESS = 1;
     public static bool BOSS_AND_PLAYER_ABOVE_SAND;
     public static float PARRY_TIME_FREEZE = -1;
     public static int PHASE_2_QUOTA = 25;
     public static int PHASE_3_QUOTA = 75;
     public static int END_FIGHT_QUOTA = 160;
+    public static int DESPERATION_PHASE_LENGTH = 50;
     public static void SetupSettings(ConfigFile Config)
     {
         SAND_EFFECTS_BRIGHTNESS = Config.Bind(
@@ -24,6 +26,12 @@ public static class Settings
             "Boss And Player Above Sand",
             false,
             "I already put the boss and the player above most of the sand effects, turn this on if you want to put them above everything."
+        ).Value;
+        DISABLE_WIND_EFFECTS = Config.Bind(
+            "Visual Effects",
+            "Disable Wind Effects",
+            false,
+            "Disables the wind effects in the background and foreground."
         ).Value;
         PARRY_TIME_FREEZE = Config.Bind(
             "Accessibility",
@@ -54,6 +62,12 @@ public static class Settings
             "Fight End Quota",
             160,
             "Quota of parries to trigger the fight end."
+        ).Value;
+        DESPERATION_PHASE_LENGTH = Config.Bind(
+            "Bossfight Settings",
+            "Desperation Phase Length",
+            50,
+            "For each unit here, 2 coral spears spawn every 0.15 seconds."
         ).Value;
     }
 }

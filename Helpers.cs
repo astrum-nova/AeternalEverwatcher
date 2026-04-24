@@ -49,10 +49,11 @@ public static class Helpers
     public static IEnumerator DestroyLater(GameObject go, float delay)
     {
         yield return new WaitForSeconds(delay);
-        Object.Destroy(go);
+        go.SetActive(false);
     }
-    public static void SandColorSetup(GameObject wave)
+    public static void SandColorSetup(GameObject wave, string name)
     {
+        wave.name = name;
         foreach (var pt in wave.GetComponentsInChildren<ParticleSystem>(true))
         {
             if (pt.name is "sand_blown" or "particles_small") continue;
@@ -120,17 +121,17 @@ public static class Helpers
     }
     public static void InitSandEffects()
     {
-        //var sandburstOriginal = GameObject.Find("sand_burst_effect_uppercut");
         var sandburstOriginal = AeternalEverwatcherPlugin.controlFsm.GetLastActionOfType<ActivateGameObject>("Uppercut 1")!.gameObject.GameObject.Value;
-        SandColorSetup(sandburstOriginal);
+        SandColorSetup(sandburstOriginal, "sandburst");
         CustomBehaviour.sandburst = Object.Instantiate(sandburstOriginal);
         CustomBehaviour.sandburst.SetActive(false);
         SandSpeedSetup(CustomBehaviour.sandburst, 3);
         CustomBehaviour.groundWave = Object.Instantiate(CustomBehaviour.sandburst);
         CustomBehaviour.groundWave.SetActive(false);
-        SandColorSetup(CustomBehaviour.groundWave);
+        SandColorSetup(CustomBehaviour.groundWave, "groundWave");
         GroundWaveSetup(CustomBehaviour.groundWave);
         CustomBehaviour.pcrBurst = Object.Instantiate(CustomBehaviour.groundWave);
+        CustomBehaviour.pcrBurst.name = "pcrBurst";
         CustomBehaviour.pcrBurst.SetActive(false);
         SandSpeedSetup(CustomBehaviour.groundWave);
     }
@@ -146,9 +147,8 @@ public static class Helpers
         return true;
     }
 
-    public static IEnumerator ModifyTerrain()
+    public static void ModifyTerrain()
     {
-        yield return new WaitForSeconds(0.5f);
         //? Boss aggro range, extended to the far left edges of the scene
         var battleRange = GameObject.Find("Battle Range");
         battleRange.transform.position = battleRange.transform.position with { x = 75.2f };
@@ -191,6 +191,18 @@ public static class Helpers
         var terrain = tilemapRenderData.Find("Chunk 0 4")!;
         terrain.transform.localScale = terrain.localScale with { x = 300 };
         terrain.transform.position = terrain.position with { x = 0 };
+        var borderLeft = Object.Instantiate(terrain, terrain.parent);
+        borderLeft.transform.position = new Vector3(-2.6f, 5, 0);
+        borderLeft.transform.localScale = new Vector3(1, 65, 1);
+        borderLeft.gameObject.AddComponent<NonSlider>();
+        borderLeft.gameObject.GetComponent<MeshRenderer>().enabled = false;
+        borderLeft.gameObject.name = "BorderLeftHitbox";
+        var borderRight = Object.Instantiate(terrain, terrain.parent);
+        borderRight.transform.position = new Vector3(173, -2, 0);
+        borderRight.transform.localScale = new Vector3(1, 65, 1);
+        borderRight.gameObject.AddComponent<NonSlider>();
+        borderRight.gameObject.GetComponent<MeshRenderer>().enabled = false;
+        borderRight.gameObject.name = "BorderRightHitbox";
         var stepFix = Object.Instantiate(terrain, terrain.parent);
         stepFix.transform.position = new Vector3(173.9688f, 3.0291f, terrain.transform.position.z);
         //? Copy over art assets to cover the extended ground

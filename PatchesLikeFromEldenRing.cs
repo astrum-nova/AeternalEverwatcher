@@ -1,6 +1,7 @@
 ﻿using System;
 using GlobalEnums;
 using HarmonyLib;
+using TeamCherry.Localization;
 
 namespace AeternalEverwatcher;
 
@@ -63,5 +64,20 @@ public class PatchesLikeFromEldenRing
                 IsNailTag = true
             });
         }
+    }
+}
+
+[HarmonyPatch(typeof(Language), "Get")]
+[HarmonyPatch([typeof(string), typeof(string)])]
+public static class BossTitlePatch
+{
+    private static void Postfix(string key, string sheetTitle, ref string __result)
+    {
+        __result = key switch
+        {
+            "GREY_CORAL_WARRIOR_SUPER" => "Aeternal",
+            "GREY_CORAL_WARRIOR_MAIN" => "Everwatcher",
+            _ => __result
+        };
     }
 }

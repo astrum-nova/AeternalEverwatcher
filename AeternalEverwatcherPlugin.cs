@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using System.Linq;
 using BepInEx;
 using BepInEx.Logging;
@@ -7,7 +6,6 @@ using GlobalEnums;
 using HarmonyLib;
 using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
-using Silksong.AssetHelper;
 using Silksong.AssetHelper.ManagedAssets;
 using Silksong.FsmUtil;
 using UnityEngine;
@@ -42,7 +40,11 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     public static bool eigongAirDashing;
     public static bool quadSlashing;
     public static bool tookDamage;
-
+    public IEnumerator Start()
+    {
+        yield return new WaitForSeconds(2f);
+        Harmony.CreateAndPatchAll(typeof(BossTitlePatch));
+    }
     private void Awake()
     {
         Instance = this;
@@ -55,7 +57,9 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         SceneManager.sceneLoaded += (scene, _) =>
         {
             if (!scene.name.Equals("Coral_39")) return;
+            if (Settings.DISABLE_WIND_EFFECTS) GameObject.Find("wind_effects").SetActive(false);
             PlayerData.instance.wokeGreyWarrior = false;
+            PlayerData.instance.defeatedGreyWarrior = false;
             foundWatcher = false;
             foreach (var fsm in FindObjectsByType<PlayMakerFSM>(FindObjectsSortMode.None)!.Where(fsm => fsm.name.Equals("Coral Warrior Grey")))
                 switch (fsm.FsmName)
@@ -88,6 +92,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             pcrSlamming = false;
             eigongAirDashing = false;
             quadSlashing = false;
+            Pools.Clear();
         };
         CustomBehaviour.skProjectile = ManagedAsset<GameObject>.FromNonSceneAsset("Assets/Prefabs/Hornet Enemies/Song Knight Projectile.prefab", "localpoolprefabs_assets_areahangareasong");
         CustomBehaviour.khannUcSpear = ManagedAsset<GameObject>.FromSceneAsset("memory_coral_tower", "Boss Scene/Uppercut Spear");
@@ -128,10 +133,11 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetFirstActionOfType<CheckHeroPerformanceRegion>("Sleep")!.MinReactDelay = 1;
         controlFsm.GetFirstActionOfType<CheckHeroPerformanceRegion>("Sleep")!.MaxReactDelay = 1;
         controlFsm.GetState("Sleep")!.AddLambdaMethod(_ => transform.position = transform.position with { x = transform.position.x + 15 });
+        controlFsm.GetState("Wake Roar 2")!.AddLambdaMethod(_ => controlFsm.RemoveActionsOfType<DisplayBossTitle>("Wake Roar 2"));
         controlFsm.GetState("Wake Antic")!.AddLambdaMethod(_ =>
         {
             Instance.StartCoroutine(CustomBehaviour.ArenaBorders(true));
-            Instance.StartCoroutine(Helpers.ModifyTerrain());
+            Helpers.ModifyTerrain();
         });
         controlFsm.GetState("Stun Recover")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()));
         controlFsm.GetState("Stunned")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.StunSpears()));
@@ -178,7 +184,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         });
 
         controlFsm.GetState("Slash Combo 1")!.AddLambdaMethod(_ => { if (PHASE_2 && !fiveSLash && !quadSlashing) didSlashCombo1 = true; });
-        controlFsm.GetState("Slash Combo 3")!.AddLambdaMethod(_ => { if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile()); });
+        controlFsm.GetState("Slash Combo 3")!.AddLambdaMethod(_ => { if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.SpawnSkProjectile()); });
         controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => { controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = Helpers.GetPosDiffSpeed() * (fiveSLash ? -1 : 1); });
         controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:!fiveSLash && !quadSlashing));
 
@@ -200,7 +206,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                     }
                 }
             }
-            if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile());
+            if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.SpawnSkProjectile());
         });
 
         controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = Helpers.GetPosDiffSpeed() * -0.5f);
@@ -209,7 +215,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             if (CustomBehaviour.sandburstSmall == null)
             {
                 CustomBehaviour.sandburstSmall = transform.Find("Pt SwordSlam").gameObject;
-                Helpers.SandColorSetup(CustomBehaviour.sandburstSmall);
+                Helpers.SandColorSetup(CustomBehaviour.sandburstSmall, "sandburstSmall");
             }
             if (PHASE_2 && didSlashCombo1)
             {
@@ -232,7 +238,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         });
         controlFsm.GetState("F Slash Recover")!.AddLambdaMethod(_ =>
         {
-            if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.spawnSkProjectile());
+            if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.SpawnSkProjectile());
             else if (PHASE_3 && eigongAirDashing) controlFsm.SetState("F Slash Antic");
             if (quadSlashing) controlFsm.SetState("Init Idle");
         });
@@ -257,7 +263,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetState("Uppercut Antic")!.AddLambdaMethod(_ =>
         {
             if (!pcrSlamming && PhaseCheck()) return;
-            switch (Random.Range(0, 3))
+            switch (Random.Range(0, PHASE_3 ? 3 : 4))
             {
                 case 0 when PHASE_3:
                     fiveSLash = true;
@@ -294,9 +300,5 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
 
 /*
  TODO:
- - implement random moves pool for close and far range
  - fix coral spear particle colors on some stuff
- - implement pooling for sand shockwaves and spears especially cause of the desperation phase, maybe use a Pools class
- - cache all WaitForSeconds
- - add an option for the duration of the desperation phase
 */
