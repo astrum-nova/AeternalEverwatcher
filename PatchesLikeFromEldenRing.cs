@@ -48,22 +48,20 @@ public class PatchesLikeFromEldenRing
         if (!GameManager.instance.TimeSlowed) GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
         AeternalEverwatcherPlugin.healthManager.SpriteFlash.flashArmoured();
         HeroController.instance.AddSilk(1, false);
-        if (AeternalEverwatcherPlugin.parryCounter >= AeternalEverwatcherPlugin.END_FIGHT_QUOTA && AeternalEverwatcherPlugin.PHASE_2 && AeternalEverwatcherPlugin.PHASE_3)
+        if (AeternalEverwatcherPlugin.parryCounter < Settings.END_FIGHT_QUOTA || !AeternalEverwatcherPlugin.PHASE_2 || !AeternalEverwatcherPlugin.PHASE_3) return;
+        AeternalEverwatcherPlugin.ResetFlags();
+        AeternalEverwatcherPlugin.healthManager.TakeDamage(new HitInstance
         {
-            AeternalEverwatcherPlugin.ResetFlags();
-            AeternalEverwatcherPlugin.healthManager.TakeDamage(new HitInstance
-            {
-                Source = HeroController.instance.gameObject,
-                AttackType = AttackTypes.Spell,
-                DamageDealt = 3000,
-                Direction = 0,
-                Multiplier = 1f,
-                MagnitudeMultiplier = 1f,
-                IgnoreInvulnerable = true,
-                HitEffectsType = EnemyHitEffectsProfile.EffectsTypes.Full,
-                IsNailTag = true
-            });
-        }
+            Source = HeroController.instance.gameObject,
+            AttackType = AttackTypes.Spell,
+            DamageDealt = 3000,
+            Direction = 0,
+            Multiplier = 1f,
+            MagnitudeMultiplier = 1f,
+            IgnoreInvulnerable = true,
+            HitEffectsType = EnemyHitEffectsProfile.EffectsTypes.Full,
+            IsNailTag = true
+        });
     }
 }
 

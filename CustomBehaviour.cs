@@ -36,7 +36,7 @@ public static class CustomBehaviour
     public static GameObject pcrBurst = null!;
     public static GameObject sandburst = null!;
     public static GameObject sandburstSmall = null!;
-    public static Transform originObject = null!;
+    private static Transform originObject = null!;
 
     public static IEnumerator SpawnSkProjectile()
     {

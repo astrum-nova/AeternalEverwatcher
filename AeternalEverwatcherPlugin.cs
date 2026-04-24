@@ -19,28 +19,26 @@ namespace AeternalEverwatcher;
 [BepInDependency("org.silksong-modding.assethelper")]
 public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
 {
+    //! DEBUG !\\
     private static readonly ManualLogSource logger = BepInEx.Logging.Logger.CreateLogSource("[Aeternal Everwatcher]");
     public static void log(string msg) => logger.LogInfo(msg);
-    public static AeternalEverwatcherPlugin Instance { get; set; } = null!;
-
+    //! DEBUG !\\
+    public static AeternalEverwatcherPlugin Instance { get; private set; } = null!;
     public static bool PHASE_2;
     public static bool PHASE_3;
-    public static int PHASE_2_QUOTA = 25;
-    public static int PHASE_3_QUOTA = 75;
-    public static int END_FIGHT_QUOTA = 160;
     public static int parryCounter;
     public static PlayMakerFSM controlFsm = null!;
     public static HealthManager healthManager = null!;
     public new static Transform transform = null!;
     public static bool foundWatcher;
-    public static bool didSlashCombo1;
+    private static bool didSlashCombo1;
     public static bool fiveSLash;
-    public static bool fiveSLashedOnce;
+    private static bool fiveSLashedOnce;
     public static bool pcrSlamming;
     public static bool eigongAirDashing;
     public static bool quadSlashing;
     public static bool tookDamage;
-    public static bool sandburstOutSetup;
+    private static bool sandburstOutSetup;
     public IEnumerator Start()
     {
         yield return new WaitForSeconds(2f);
@@ -52,9 +50,6 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         Logger.LogInfo($"Plugin {Name} ({Id}) has loaded!");
         Harmony.CreateAndPatchAll(typeof(PatchesLikeFromEldenRing));
         Settings.SetupSettings(Config);
-        PHASE_2_QUOTA = Settings.PHASE_2_QUOTA;
-        PHASE_3_QUOTA = Settings.PHASE_3_QUOTA;
-        END_FIGHT_QUOTA = Settings.END_FIGHT_QUOTA;
         SceneManager.sceneLoaded += (scene, _) =>
         {
             if (!scene.name.Equals("Coral_39")) return;
@@ -69,6 +64,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                     case "Control":
                         controlFsm = fsm;
                         healthManager = fsm.GetComponent<HealthManager>();
+                        healthManager.TookDamage += () => healthManager.HealToMax();
                         transform = fsm.gameObject.transform;
                         transform.gameObject.GetComponentInChildren<tk2dSprite>().renderLayer = 200;
                         foreach (var componentsInChild in HeroController.instance.GetComponentsInChildren<tk2dSprite>()) componentsInChild.renderLayer = 500;
@@ -107,31 +103,27 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         eigongAirDashing = false;
         tookDamage = false;
     }
-    public static bool PhaseCheck()
+    private static bool PhaseCheck()
     {
         if (fiveSLash || eigongAirDashing || pcrSlamming || quadSlashing) return false;
-        if (parryCounter >= PHASE_2_QUOTA && !PHASE_2 && CustomBehaviour.groundWave && CustomBehaviour.pcrBurst && CustomBehaviour.sandburst && CustomBehaviour.sandburstSmall)
+        if (parryCounter >= Settings.PHASE_2_QUOTA && !PHASE_2 && CustomBehaviour.groundWave && CustomBehaviour.pcrBurst && CustomBehaviour.sandburst && CustomBehaviour.sandburstSmall)
         {
-            parryCounter = PHASE_2_QUOTA;
+            parryCounter = Settings.PHASE_2_QUOTA;
             ResetFlags();
             PHASE_2 = true;
             controlFsm.SetState("Stun Start");
             return true;
         }
-
-        if (parryCounter >= PHASE_3_QUOTA && !PHASE_3 && PHASE_2)
-        {
-            parryCounter = PHASE_3_QUOTA;
-            ResetFlags();
-            PHASE_3 = true;
-            controlFsm.SetState("Stun Start");
-            return true;
-        }
-        return false;
+        if (parryCounter < Settings.PHASE_3_QUOTA || PHASE_3 || !PHASE_2) return false;
+        parryCounter = Settings.PHASE_3_QUOTA;
+        ResetFlags();
+        PHASE_3 = true;
+        controlFsm.SetState("Stun Start");
+        return true;
     }
     private static void SetupWatcher()
     {
-        //* Initialization & Intro (Top Center)
+        //* Initialization
         controlFsm.GetFirstActionOfType<CheckHeroPerformanceRegion>("Sleep")!.MinReactDelay = 1;
         controlFsm.GetFirstActionOfType<CheckHeroPerformanceRegion>("Sleep")!.MaxReactDelay = 1;
         controlFsm.GetState("Sleep")!.AddLambdaMethod(_ => transform.position = transform.position with { x = transform.position.x + 15 });
@@ -167,14 +159,12 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetFirstActionOfType<StartRoarEmitter>("Wake Roar 2")!.stunHero = false;
         controlFsm.GetFirstActionOfType<Wait>("Wake Roar 2")!.time = 0.5f;
         controlFsm.GetFirstActionOfType<Wait>("Emerge Pause")!.time = 0;
-        
-        //* Neutral & Range Checking (Middle Section)
+        //* Neutral
         controlFsm.GetFirstActionOfType<Wait>("Init Idle")!.time = 0.3f;
         controlFsm.GetFirstActionOfType<Wait>("Idle")!.time = 0;
         controlFsm.GetState("Very Far")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()));
         controlFsm.GetFirstActionOfType<Wait>("Range Out Pause")!.time = 0;
-
-        //* Slash Combo Branch (Left Side)
+        //* Slash Combo
         controlFsm.GetFirstActionOfType<FaceObjectV2>("Slash Combo Antic Q")!.everyFrame = true;
         controlFsm.GetState("Slash Combo Antic Q")!.AddLambdaMethod(_ =>
         {
@@ -182,7 +172,6 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.45f));
             controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : Helpers.GetPosDiffSpeed() * -1;
         });
-
         controlFsm.GetFirstActionOfType<FaceObjectV2>("Slash Combo Antic")!.everyFrame = true;
         controlFsm.GetState("Slash Combo Antic")!.AddLambdaMethod(_ =>
         {
@@ -190,12 +179,10 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.55f));
             controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 1")!.speed = fiveSLash ? 0 : Helpers.GetPosDiffSpeed() * -1;
         });
-
         controlFsm.GetState("Slash Combo 1")!.AddLambdaMethod(_ => { if (PHASE_2 && !fiveSLash && !quadSlashing) didSlashCombo1 = true; });
         controlFsm.GetState("Slash Combo 3")!.AddLambdaMethod(_ => { if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.SpawnSkProjectile()); });
         controlFsm.GetState("Slash Combo 4")!.AddLambdaMethod(_ => { controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 5")!.speed = Helpers.GetPosDiffSpeed() * (fiveSLash ? -1 : 1); });
         controlFsm.GetState("Slash Combo 5")!.AddLambdaMethod(_ => transform.FlipLocalScale(x:!fiveSLash && !quadSlashing));
-
         controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ =>
         {
             if (PHASE_3)
@@ -216,7 +203,6 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             }
             if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.SpawnSkProjectile());
         });
-
         controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = Helpers.GetPosDiffSpeed() * -0.5f);
         controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ =>
         {
@@ -232,8 +218,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             ResetFlags();
         });
         controlFsm.GetState("Slash Combo 13")!.AddLambdaMethod(_ => controlFsm.SetState("Range Check"));
-
-        //* F Slash Branch (Between Left and Center)
+        //* F Slash Branch
         controlFsm.GetState("F Slash Antic")!.AddLambdaMethod(_ =>
         {
             if (!quadSlashing && PhaseCheck()) return;
@@ -250,8 +235,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             else if (PHASE_3 && eigongAirDashing) controlFsm.SetState("F Slash Antic");
             if (quadSlashing) controlFsm.SetState("Init Idle");
         });
-
-        //* Jump Slash / Dash Branch (Center / Right Center)
+        //* Jump Slash / Dash
         controlFsm.GetState("Blocked Hit")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash New"));
         controlFsm.GetState("Dash To Jump")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
         controlFsm.GetState("Dash To Antic")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
@@ -261,12 +245,10 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             else controlFsm.SetState("F Slash Antic");
         });
         controlFsm.GetFirstActionOfType<SetVelocity2d>("Jump Slash Launch")!.y = 3;
-
-        //* Digging & Uppercut Branch (Far Right)
+        //* Digging / Uppercut
         controlFsm.GetFirstActionOfType<FloatClamp>("Dig Pos")!.minValue = 0;
         controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.3f;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 120;
-
         controlFsm.GetFirstActionOfType<FaceObjectV2>("Uppercut Antic")!.everyFrame = true;
         controlFsm.GetState("Uppercut Antic")!.AddLambdaMethod(_ =>
         {
@@ -283,7 +265,6 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                     break;
             }
         });
-
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Uppercut 1")!.speed = 70;
         controlFsm.GetState("Uppercut 1")!.AddLambdaMethod(_ =>
         {
@@ -297,11 +278,5 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             controlFsm.SetState("Uppercut Launch");
         });
         controlFsm.GetState("Die")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.DesperationSpears()));
-    }
-
-    private void Update()
-    {
-        if (!foundWatcher) return;
-        HeroController.instance.MaxHealth();
     }
 }
