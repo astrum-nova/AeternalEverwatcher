@@ -220,10 +220,11 @@ public static class CustomBehaviour
             AeternalEverwatcherPlugin.controlFsm.SetState("Slash Combo 1");
             AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = true;
             AeternalEverwatcherPlugin.Instance.StartCoroutine(SpawnSkProjectile());
-            yield return _waitForSeconds0_25;
+            yield return _waitForSeconds0_2;
+            AeternalEverwatcherPlugin.Instance.StartCoroutine(SpawnSkProjectile());
+            yield return _waitForSeconds0_05;
             AeternalEverwatcherPlugin.controlFsm.SetState("F Slash 2");
             AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = true;
-            AeternalEverwatcherPlugin.Instance.StartCoroutine(SpawnSkProjectile());
             yield return _waitForSeconds0_4;
             AeternalEverwatcherPlugin.controlFsm.SetState("Jump Slash New");
             AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = true;
