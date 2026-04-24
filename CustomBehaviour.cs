@@ -14,7 +14,6 @@ public static class CustomBehaviour
     private static readonly WaitForSeconds _waitForSeconds9 = new(9);
     private static readonly WaitForSeconds _waitForSeconds1_3 = new(1.3f);
     private static readonly WaitForSeconds _waitForSeconds0_4 = new(0.4f);
-    private static readonly WaitForSeconds _waitForSeconds0_25 = new(0.25f);
     private static readonly WaitForSeconds _waitForSeconds0_425 = new(0.425f);
     private static readonly WaitForSeconds _waitForSeconds0_375 = new(0.375f);
     private static readonly WaitForSeconds _waitForSeconds0_65 = new(0.65f);
@@ -37,6 +36,7 @@ public static class CustomBehaviour
     public static GameObject pcrBurst = null!;
     public static GameObject sandburst = null!;
     public static GameObject sandburstSmall = null!;
+    public static Transform originObject = null!;
 
     public static IEnumerator SpawnSkProjectile()
     {
@@ -148,8 +148,7 @@ public static class CustomBehaviour
     }
     public static IEnumerator SpawnSandWave(bool left = true, bool right = true)
     {
-        //TODO: try to chache the origin instead of finding it every time
-        var originObject = AeternalEverwatcherPlugin.transform.FindRelativeTransformWithPath("sand_burst_effect_uppercut_origin", false)!;
+        if (!originObject) originObject = AeternalEverwatcherPlugin.transform.FindRelativeTransformWithPath("sand_burst_effect_uppercut_origin", false)!;
         yield return _waitForSeconds0_2;
         float pos1 = 0;
         float pos2 = 0;
@@ -284,18 +283,8 @@ public static class CustomBehaviour
         {
             yield return khannUcSpear.Load();
             khannUcSpearSetup = khannUcSpear.InstantiateAsset();
-            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<SpriteRenderer>(true))
-            {
-                if (componentsInChild.gameObject.transform.parent.name == "blurred") componentsInChild.color = new Color(0.4f, 1f, 1f, 1);
-                else componentsInChild.color = new Color(0.5f, 1f, 1f, 1);
-            }
-            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<ParticleSystemRenderer>(true))
-            {
-                AeternalEverwatcherPlugin.log("componentsInChild.name: " + componentsInChild.name);
-                AeternalEverwatcherPlugin.log("componentsInChild.gameObject.transform.parent.name: " + componentsInChild.gameObject.transform.parent.name);
-                if (componentsInChild.name.StartsWith("coral_spear_shatter_particles")) componentsInChild.material.SetColor(Helpers.Color1, new Color(0.5f, 1f, 1f, 1));
-                else componentsInChild.material.SetColor(Helpers.Color1, new Color(0.6f, 0.8f, 0.8f, 1));
-            }
+            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<SpriteRenderer>(true)) componentsInChild.color = componentsInChild.gameObject.transform.parent.name == "blurred" ? new Color(0.4f, 1f, 1f, 1) : new Color(0.5f, 1f, 1f, 1);
+            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<ParticleSystemRenderer>(true)) componentsInChild.material.SetColor(Helpers.Color1, componentsInChild.name.StartsWith("coral_spear_shatter_particles") ? new Color(0.5f, 1f, 1f, 1) : new Color(0.6f, 0.8f, 0.8f, 1));
             khannUcSpearSetup.SetActive(false);
             khannUcSpearSetup.name = "spear";
             left1 = Object.Instantiate(khannUcSpearSetup, AeternalEverwatcherPlugin.transform);

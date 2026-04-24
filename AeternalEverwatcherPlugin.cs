@@ -305,8 +305,3 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         HeroController.instance.MaxHealth();
     }
 }
-
-/*
- TODO:
- - fix coral spear particle colors on some stuff
-*/

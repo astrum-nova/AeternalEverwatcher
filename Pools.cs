@@ -6,13 +6,13 @@ namespace AeternalEverwatcher;
 
 public static class Pools
 {
-    public static GameObject pooledObjectsParent = new("Pooled Objects Parent");
-    private static List<GameObject> spears = [];
-    private static List<GameObject> windSlashes = [];
-    private static List<GameObject> sandWaves = [];
-    private static List<GameObject> groundWaves = [];
-    private static List<GameObject> sandBurstSmalls = [];
-    private static List<GameObject> pcrBursts = [];
+    private static GameObject pooledObjectsParent = new("Pooled Objects Parent");
+    private static readonly List<GameObject> spears = [];
+    private static readonly List<GameObject> windSlashes = [];
+    private static readonly List<GameObject> sandWaves = [];
+    private static readonly List<GameObject> groundWaves = [];
+    private static readonly List<GameObject> sandBurstSmalls = [];
+    private static readonly List<GameObject> pcrBursts = [];
 
     public static GameObject GetSpear() => GetPooledObject(spears, CustomBehaviour.khannUcSpearSetup);
     public static GameObject GetWindSlash() => GetPooledObject(windSlashes, CustomBehaviour.skProjectileSetup);
