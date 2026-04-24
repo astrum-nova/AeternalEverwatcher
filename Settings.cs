@@ -4,8 +4,8 @@ namespace AeternalEverwatcher;
 
 public static class Settings
 {
-    public static bool ON_DAMAGE_FREEZE = true;
-    public static bool DISABLE_WIND_EFFECTS = true;
+    public static bool ON_DAMAGE_FREEZE;
+    public static bool DISABLE_WIND_EFFECTS;
     public static float SAND_EFFECTS_BRIGHTNESS = 1;
     public static bool BOSS_AND_PLAYER_ABOVE_SAND;
     public static float PARRY_TIME_FREEZE = -1;
@@ -42,8 +42,8 @@ public static class Settings
         ON_DAMAGE_FREEZE = Config.Bind(
             "Accessibility",
             "On Damage Freeze",
-            true,
-            "This setting should help you keep the rhythm your even when taking damage."
+            false,
+            "This setting should help you keep your rhythm even when taking damage."
         ).Value;
         PHASE_2_QUOTA = Config.Bind(
             "Bossfight Settings",
@@ -60,7 +60,7 @@ public static class Settings
         END_FIGHT_QUOTA = Config.Bind(
             "Bossfight Settings",
             "Fight End Quota",
-            160,
+            170,
             "Quota of parries to trigger the fight end."
         ).Value;
         DESPERATION_PHASE_LENGTH = Config.Bind(

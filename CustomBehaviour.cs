@@ -283,8 +283,18 @@ public static class CustomBehaviour
         {
             yield return khannUcSpear.Load();
             khannUcSpearSetup = khannUcSpear.InstantiateAsset();
-            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<SpriteRenderer>(true)) componentsInChild.color = new Color(0.5f, 1f, 1f, 1);
-            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<ParticleSystemRenderer>(true)) componentsInChild.material.SetColor(Helpers.Color1, new Color(0.6f, 0.8f, 0.8f, 1));
+            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<SpriteRenderer>(true))
+            {
+                if (componentsInChild.gameObject.transform.parent.name == "blurred") componentsInChild.color = new Color(0.4f, 1f, 1f, 1);
+                else componentsInChild.color = new Color(0.5f, 1f, 1f, 1);
+            }
+            foreach (var componentsInChild in khannUcSpearSetup.GetComponentsInChildren<ParticleSystemRenderer>(true))
+            {
+                AeternalEverwatcherPlugin.log("componentsInChild.name: " + componentsInChild.name);
+                AeternalEverwatcherPlugin.log("componentsInChild.gameObject.transform.parent.name: " + componentsInChild.gameObject.transform.parent.name);
+                if (componentsInChild.name.StartsWith("coral_spear_shatter_particles")) componentsInChild.material.SetColor(Helpers.Color1, new Color(0.5f, 1f, 1f, 1));
+                else componentsInChild.material.SetColor(Helpers.Color1, new Color(0.6f, 0.8f, 0.8f, 1));
+            }
             khannUcSpearSetup.SetActive(false);
             khannUcSpearSetup.name = "spear";
             left1 = Object.Instantiate(khannUcSpearSetup, AeternalEverwatcherPlugin.transform);

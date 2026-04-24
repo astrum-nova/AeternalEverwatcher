@@ -40,6 +40,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     public static bool eigongAirDashing;
     public static bool quadSlashing;
     public static bool tookDamage;
+    public static bool sandburstOutSetup;
     public IEnumerator Start()
     {
         yield return new WaitForSeconds(2f);
@@ -92,6 +93,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             pcrSlamming = false;
             eigongAirDashing = false;
             quadSlashing = false;
+            sandburstOutSetup = false;
             Pools.Clear();
         };
         CustomBehaviour.skProjectile = ManagedAsset<GameObject>.FromNonSceneAsset("Assets/Prefabs/Hornet Enemies/Song Knight Projectile.prefab", "localpoolprefabs_assets_areahangareasong");
@@ -133,7 +135,13 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetFirstActionOfType<CheckHeroPerformanceRegion>("Sleep")!.MinReactDelay = 1;
         controlFsm.GetFirstActionOfType<CheckHeroPerformanceRegion>("Sleep")!.MaxReactDelay = 1;
         controlFsm.GetState("Sleep")!.AddLambdaMethod(_ => transform.position = transform.position with { x = transform.position.x + 15 });
-        controlFsm.GetState("Wake Roar 2")!.AddLambdaMethod(_ => controlFsm.RemoveActionsOfType<DisplayBossTitle>("Wake Roar 2"));
+        controlFsm.GetState("Wake Roar 2")!.AddLambdaMethod(_ =>
+        {
+            if (sandburstOutSetup) return;
+            controlFsm.RemoveActionsOfType<DisplayBossTitle>("Wake Roar 2");
+            Helpers.SandColorSetup(controlFsm.GetFirstActionOfType<ActivateGameObject>("Wake Roar 2")!.gameObject.GameObject.Value, "sandburstOut");
+            sandburstOutSetup = true;
+        });
         controlFsm.GetState("Wake Antic")!.AddLambdaMethod(_ =>
         {
             Instance.StartCoroutine(CustomBehaviour.ArenaBorders(true));
