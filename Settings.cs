@@ -60,7 +60,7 @@ public static class Settings
         END_FIGHT_QUOTA = Config.Bind(
             "Bossfight Settings",
             "Fight End Quota",
-            170,
+            160,
             "Quota of parries to trigger the fight end."
         ).Value;
         DESPERATION_PHASE_LENGTH = Config.Bind(

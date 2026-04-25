@@ -20,8 +20,8 @@ namespace AeternalEverwatcher;
 public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
 {
     //! DEBUG !\\
-    private static readonly ManualLogSource logger = BepInEx.Logging.Logger.CreateLogSource("[Aeternal Everwatcher]");
-    public static void log(string msg) => logger.LogInfo(msg);
+    //! private static readonly ManualLogSource logger = BepInEx.Logging.Logger.CreateLogSource("[Aeternal Everwatcher]");
+    //! public static void log(string msg) => logger.LogInfo(msg);
     //! DEBUG !\\
     public static AeternalEverwatcherPlugin Instance { get; private set; } = null!;
     public static bool PHASE_2;
