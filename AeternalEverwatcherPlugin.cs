@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using BepInEx;
 using BepInEx.Logging;
@@ -20,8 +21,8 @@ namespace AeternalEverwatcher;
 public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
 {
     //! DEBUG !\\
-    //! private static readonly ManualLogSource logger = BepInEx.Logging.Logger.CreateLogSource("[Aeternal Everwatcher]");
-    //! public static void log(string msg) => logger.LogInfo(msg);
+    private static readonly ManualLogSource logger = BepInEx.Logging.Logger.CreateLogSource("[Aeternal Everwatcher]");
+    public static void log(string msg) => logger.LogInfo(msg);
     //! DEBUG !\\
     public static AeternalEverwatcherPlugin Instance { get; private set; } = null!;
     public static bool PHASE_2;
@@ -30,6 +31,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
     public static PlayMakerFSM controlFsm = null!;
     public static HealthManager healthManager = null!;
     public new static Transform transform = null!;
+    public static DamageHero damageHeroComponent = null!;
     public static bool foundWatcher;
     private static bool didSlashCombo1;
     public static bool fiveSLash;
@@ -52,11 +54,11 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         Settings.SetupSettings(Config);
         SceneManager.sceneLoaded += (scene, _) =>
         {
+            foundWatcher = false;
             if (!scene.name.Equals("Coral_39")) return;
             if (Settings.DISABLE_WIND_EFFECTS) GameObject.Find("wind_effects").SetActive(false);
             PlayerData.instance.wokeGreyWarrior = false;
             PlayerData.instance.defeatedGreyWarrior = false;
-            foundWatcher = false;
             foreach (var fsm in FindObjectsByType<PlayMakerFSM>(FindObjectsSortMode.None)!.Where(fsm => fsm.name.Equals("Coral Warrior Grey")))
                 switch (fsm.FsmName)
                 {
@@ -66,6 +68,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                         healthManager = fsm.GetComponent<HealthManager>();
                         healthManager.TookDamage += () => healthManager.HealToMax();
                         transform = fsm.gameObject.transform;
+                        damageHeroComponent = transform.Find("Body Damager").GetComponent<DamageHero>();
                         transform.gameObject.GetComponentInChildren<tk2dSprite>().renderLayer = 200;
                         foreach (var componentsInChild in HeroController.instance.GetComponentsInChildren<tk2dSprite>()) componentsInChild.renderLayer = 500;
                         foundWatcher = true;
@@ -139,8 +142,13 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             Instance.StartCoroutine(CustomBehaviour.ArenaBorders(true));
             Helpers.ModifyTerrain();
         });
-        controlFsm.GetState("Stun Recover")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()));
+        controlFsm.GetState("Stun Recover")!.AddLambdaMethod(_ =>
+        {
+            Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave());
+            damageHeroComponent.enabled = false;
+        });
         controlFsm.GetState("Stunned")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.StunSpears()));
+        controlFsm.GetLastActionOfType<ActivateGameObject>("Stun Land")!.activate = false;
         controlFsm.GetState("Stunned")!.AddAction(new ObjectJitter
         {
             gameObject = new FsmOwnerDefault
@@ -236,7 +244,6 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             if (quadSlashing) controlFsm.SetState("Init Idle");
         });
         //* Jump Slash / Dash
-        controlFsm.GetState("Blocked Hit")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash New"));
         controlFsm.GetState("Dash To Jump")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
         controlFsm.GetState("Dash To Antic")!.AddLambdaMethod(_ => controlFsm.SetState("Jump Slash Antic"));
         controlFsm.GetState("Jump Slash Antic")!.AddLambdaMethod(_ =>
@@ -263,6 +270,10 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                 case 1:
                     controlFsm.SetState("Evade Antic");
                     break;
+                case 2:
+                case 3:
+                    if (PHASE_2) CustomBehaviour.CreateWave("sandTelegraph", new Vector3(transform.position.x - 15 * transform.localScale.x, CustomBehaviour.SANDBURST_DEFAULT_Y - 4, CustomBehaviour.sandTelegraph.transform.position.z), rotation:false);
+                    break;
             }
         });
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Uppercut 1")!.speed = 70;
@@ -278,5 +289,33 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             controlFsm.SetState("Uppercut Launch");
         });
         controlFsm.GetState("Die")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.DesperationSpears()));
+        foreach (var fsmState in new List<FsmState>()
+                 {
+                     controlFsm.GetState("Slash Combo 1")!,
+                     controlFsm.GetState("Slash Combo 5")!,
+                     controlFsm.GetState("Slash Combo 9")!,
+                     controlFsm.GetState("F Slash Antic")!,
+                     controlFsm.GetState("Uppercut 1")!,
+                     controlFsm.GetState("Uppercut 2")!,
+                     controlFsm.GetState("Dig Out Uppercut")!,
+                     controlFsm.GetState("Jump Slash Air")!,
+                 }) fsmState.AddLambdaMethod(_ => damageHeroComponent.enabled = true);
+        foreach (var fsmState in new List<FsmState>()
+                 {
+                     controlFsm.GetState("Slash Combo 4")!,
+                     controlFsm.GetState("Slash Combo 8")!,
+                     controlFsm.GetState("Slash Combo 12")!,
+                     controlFsm.GetState("F Slash Recover")!,
+                     controlFsm.GetState("Jump Away Antic")!,
+                     controlFsm.GetState("Jump Slash Antic")!,
+                 }) fsmState.AddLambdaMethod(_ => damageHeroComponent.enabled = false);
+        Helpers.removeEventFromState("Slash Combo Antic", "BLOCKED HIT");
+        Helpers.removeEventFromState("Evade Antic", "BLOCKED HIT");
+        Helpers.removeEventFromState("Jump Away Antic", "BLOCKED HIT");
+        Helpers.removeEventFromState("Jump Slash Antic", "BLOCKED HIT");
+        Helpers.removeEventFromState("Dash", "BLOCKED HIT");
+        Helpers.removeEventFromState("Uppercut Antic", "BLOCKED HIT");
+        Helpers.removeEventFromState("Init Idle", "BLOCKED HIT");
+        Helpers.removeEventFromState("Idle", "BLOCKED HIT");
     }
 }

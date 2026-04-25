@@ -46,6 +46,13 @@ public static class Helpers
             }
         }
     }
+    public static void removeEventFromState(string stateName, string eventName)
+    {
+        var state = AeternalEverwatcherPlugin.controlFsm.FsmStates.FirstOrDefault(state => state.Name == stateName);
+        state.Transitions = state.Transitions
+            .Where(t => t.EventName != eventName)
+            .ToArray();
+    }
     public static IEnumerator DestroyLater(GameObject go, float delay)
     {
         yield return new WaitForSeconds(delay);
@@ -134,6 +141,14 @@ public static class Helpers
         CustomBehaviour.pcrBurst.name = "pcrBurst";
         CustomBehaviour.pcrBurst.SetActive(false);
         SandSpeedSetup(CustomBehaviour.groundWave);
+        CustomBehaviour.sandTelegraph = Object.Instantiate(CustomBehaviour.groundWave);
+        Object.Destroy(CustomBehaviour.sandTelegraph.transform.Find("damager").gameObject);
+        Object.Destroy(CustomBehaviour.sandTelegraph.transform.Find("sand_blown").gameObject);
+        Object.Destroy(CustomBehaviour.sandTelegraph.transform.Find("particles_small").gameObject);
+        Object.Destroy(CustomBehaviour.sandTelegraph.transform.Find("sand_burst").gameObject);
+        Object.Destroy(CustomBehaviour.sandTelegraph.transform.Find("sand_burst  back").gameObject);
+        CustomBehaviour.sandTelegraph.name = "sandTelegraph";
+        CustomBehaviour.sandTelegraph.SetActive(false);
     }
     public static IEnumerator FinishStateEarly(string eventName, float delay)
     {

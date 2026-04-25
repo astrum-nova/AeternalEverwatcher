@@ -43,6 +43,7 @@ public class PatchesLikeFromEldenRing
     private static void DamageHero_NailClash(DamageHero __instance)
     {
         if (!AeternalEverwatcherPlugin.foundWatcher) return;
+        AeternalEverwatcherPlugin.damageHeroComponent.enabled = false;
         AeternalEverwatcherPlugin.parryCounter++;
         if (StateData.iframeStates.Contains(AeternalEverwatcherPlugin.controlFsm.ActiveStateName)) HeroController.instance.StartInvulnerable(0.3f);
         if (!GameManager.instance.TimeSlowed) GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);

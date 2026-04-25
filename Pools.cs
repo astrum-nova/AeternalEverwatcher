@@ -13,6 +13,7 @@ public static class Pools
     private static readonly List<GameObject> groundWaves = [];
     private static readonly List<GameObject> sandBurstSmalls = [];
     private static readonly List<GameObject> pcrBursts = [];
+    private static readonly List<GameObject> sandTelegraphs = [];
 
     public static GameObject GetSpear() => GetPooledObject(spears, CustomBehaviour.khannUcSpearSetup);
     public static GameObject GetWindSlash() => GetPooledObject(windSlashes, CustomBehaviour.skProjectileSetup);
@@ -20,6 +21,7 @@ public static class Pools
     public static GameObject GetGroundWave() => GetPooledObject(groundWaves, CustomBehaviour.groundWave);
     public static GameObject GetSandBurstSmall() => GetPooledObject(sandBurstSmalls, CustomBehaviour.sandburstSmall);
     public static GameObject GetPcrBurst() => GetPooledObject(pcrBursts, CustomBehaviour.pcrBurst);
+    public static GameObject GetSandTelegraph() => GetPooledObject(sandTelegraphs, CustomBehaviour.sandTelegraph);
 
     public static void PrewarmSpears()
     {

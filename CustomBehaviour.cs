@@ -26,7 +26,7 @@ public static class CustomBehaviour
     private static readonly WaitForSeconds _waitForSeconds0_05 = new(0.05f);
     private static readonly WaitForSeconds _waitForSeconds1 = new(1);
     private static readonly WaitForSeconds _waitForSeconds0_15 = new(0.15f);
-    private const float SANDBURST_DEFAULT_Y = 6.552498f;
+    public const float SANDBURST_DEFAULT_Y = 6.552498f;
     private const float WINDSLASH_DEFAULT_Y = 7.327499f;
     public static ManagedAsset<GameObject> skProjectile = null!;
     public static ManagedAsset<GameObject> khannUcSpear = null!;
@@ -36,6 +36,7 @@ public static class CustomBehaviour
     public static GameObject pcrBurst = null!;
     public static GameObject sandburst = null!;
     public static GameObject sandburstSmall = null!;
+    public static GameObject sandTelegraph = null!;
     private static Transform originObject = null!;
 
     public static IEnumerator SpawnSkProjectile()
@@ -129,7 +130,7 @@ public static class CustomBehaviour
         yield return _waitForSeconds0_2;
         AeternalEverwatcherPlugin.eigongAirDashing = false;
     }
-    private static GameObject CreateWave(string waveType, Vector3 position, float delayToDestruction = 1, bool rotation = true)
+    public static GameObject CreateWave(string waveType, Vector3 position, float delayToDestruction = 1, bool rotation = true)
     {
         var wave = waveType switch
         {
@@ -137,6 +138,7 @@ public static class CustomBehaviour
             "sandburst" => Pools.GetSandWave(),
             "sandburstSmall" => Pools.GetSandBurstSmall(),
             "pcrBurst" => Pools.GetPcrBurst(),
+            "sandTelegraph" => Pools.GetSandTelegraph(),
             _ => null
         };
         wave!.transform.position = position;
