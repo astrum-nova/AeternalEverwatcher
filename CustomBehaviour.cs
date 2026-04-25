@@ -26,7 +26,7 @@ public static class CustomBehaviour
     private static readonly WaitForSeconds _waitForSeconds0_05 = new(0.05f);
     private static readonly WaitForSeconds _waitForSeconds1 = new(1);
     private static readonly WaitForSeconds _waitForSeconds0_15 = new(0.15f);
-    public const float SANDBURST_DEFAULT_Y = 6.552498f;
+    private const float SANDBURST_DEFAULT_Y = 6.552498f;
     private const float WINDSLASH_DEFAULT_Y = 7.327499f;
     public static ManagedAsset<GameObject> skProjectile = null!;
     public static ManagedAsset<GameObject> khannUcSpear = null!;
@@ -81,6 +81,7 @@ public static class CustomBehaviour
         AeternalEverwatcherPlugin.ResetFlags();
         AeternalEverwatcherPlugin.eigongAirDashing = AeternalEverwatcherPlugin.PHASE_3;
         AeternalEverwatcherPlugin.controlFsm.SetState("Wake Roar 2");
+        AeternalEverwatcherPlugin.Instance.StartCoroutine(SandTelegraph("ground"));
         Effects.EnemyCoalHurtSound.SpawnAndPlayOneShot(AeternalEverwatcherPlugin.transform.position);
         yield return _waitForSeconds0_5;
         CreateWave("groundWave", new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation:false);
@@ -130,7 +131,8 @@ public static class CustomBehaviour
         yield return _waitForSeconds0_2;
         AeternalEverwatcherPlugin.eigongAirDashing = false;
     }
-    public static GameObject CreateWave(string waveType, Vector3 position, float delayToDestruction = 1, bool rotation = true)
+
+    private static GameObject CreateWave(string waveType, Vector3 position, float delayToDestruction = 1, bool rotation = true)
     {
         var wave = waveType switch
         {
@@ -358,5 +360,25 @@ public static class CustomBehaviour
         yield return _waitForSeconds0_15;
         left2.transform.GetChild(0).gameObject.SetActive(true);
         right2.transform.GetChild(0).gameObject.SetActive(true);
+    }
+
+    public static IEnumerator SandTelegraph(string type)
+    {
+        if (!Settings.SAND_WAVE_TELEGRAPH) yield break;
+        switch (type)
+        {
+            case "uppercut":
+                CreateWave("sandTelegraph", new Vector3(AeternalEverwatcherPlugin.transform.position.x - 15 * AeternalEverwatcherPlugin.transform.localScale.x, SANDBURST_DEFAULT_Y - 4, sandTelegraph.transform.position.z), rotation: false);
+                break;
+            case "ground":
+                yield return _waitForSeconds0_15;
+                CreateWave("sandTelegraph", new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y - 4, sandTelegraph.transform.position.z), rotation: false);
+                break;
+            case "slam":
+                var pos = new Vector3(AeternalEverwatcherPlugin.transform.position.x + 21 * AeternalEverwatcherPlugin.transform.localScale.x, SANDBURST_DEFAULT_Y - 4, sandTelegraph.transform.position.z);
+                yield return _waitForSeconds0_3;
+                CreateWave("sandTelegraph", pos, rotation: false);
+                break;
+        }
     }
 }

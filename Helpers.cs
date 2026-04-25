@@ -76,7 +76,7 @@ public static class Helpers
                         renderer.material.SetColor(Color1, new Color(Settings.SAND_EFFECTS_BRIGHTNESS * 2, Settings.SAND_EFFECTS_BRIGHTNESS * 2, Settings.SAND_EFFECTS_BRIGHTNESS * 2, 1f));
                         break;
                     case "sand_burst front":
-                        renderer.material.SetColor(Color1, new Color(Settings.SAND_EFFECTS_BRIGHTNESS * 2.2f, Settings.SAND_EFFECTS_BRIGHTNESS * 2.2f, Settings.SAND_EFFECTS_BRIGHTNESS * 2.2f, 0.3f));
+                        renderer.material.SetColor(Color1, new Color(Settings.SAND_EFFECTS_BRIGHTNESS * (name == "sandTelegraph" ? 1.8f : 2.2f), Settings.SAND_EFFECTS_BRIGHTNESS * (name == "sandTelegraph" ? 1.5f : 2.2f), Settings.SAND_EFFECTS_BRIGHTNESS * (name == "sandTelegraph" ? 1.5f : 2.2f), 0.3f));
                         if (!Settings.BOSS_AND_PLAYER_ABOVE_SAND) renderer.sortingOrder = 2000;
                         break;
                     default:
@@ -148,6 +148,7 @@ public static class Helpers
         Object.Destroy(CustomBehaviour.sandTelegraph.transform.Find("sand_burst").gameObject);
         Object.Destroy(CustomBehaviour.sandTelegraph.transform.Find("sand_burst  back").gameObject);
         CustomBehaviour.sandTelegraph.name = "sandTelegraph";
+        SandColorSetup(CustomBehaviour.sandTelegraph, "sandTelegraph");
         CustomBehaviour.sandTelegraph.SetActive(false);
     }
     public static IEnumerator FinishStateEarly(string eventName, float delay)

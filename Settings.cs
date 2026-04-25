@@ -4,6 +4,11 @@ namespace AeternalEverwatcher;
 
 public static class Settings
 {
+    public static bool SAND_WAVE_TELEGRAPH;
+    public static bool NORMAL_COMBAT;
+    public static int NORMAL_HP = 900;
+    public static int NORMAL_PHASE_2_QUOTA = 700;
+    public static int NORMAL_PHASE_3_QUOTA = 400;
     public static bool ON_DAMAGE_FREEZE;
     public static bool DISABLE_WIND_EFFECTS;
     public static float SAND_EFFECTS_BRIGHTNESS = 1;
@@ -26,6 +31,12 @@ public static class Settings
             "Boss And Player Above Sand",
             false,
             "I already put the boss and the player above most of the sand effects, turn this on if you want to put them above everything."
+        ).Value;
+        SAND_WAVE_TELEGRAPH = Config.Bind(
+            "Visual Effects",
+            "Sand Wave Telegraph",
+            true,
+            "Turn on or off sand wave telegraphy (the small sand effects on the ground before a sand shockwave)."
         ).Value;
         DISABLE_WIND_EFFECTS = Config.Bind(
             "Visual Effects",
@@ -68,6 +79,30 @@ public static class Settings
             "Desperation Phase Length",
             50,
             "For each unit here, 2 coral spears spawn every 0.15 seconds."
+        ).Value;
+        NORMAL_COMBAT = Config.Bind(
+            "Normal Combat Mode",
+            "Normal Combat Mode",
+            false,
+            "Turns on/off normal combat, meaning you wont need to parry to beat the boss, you can attack him normally. Remember to configure the options below because i did not test this mode!"
+        ).Value;
+        NORMAL_HP = Config.Bind(
+            "Normal Combat Mode",
+            "Normal Combat HP",
+            900,
+            "Sets the initial hp in normal combat mode."
+        ).Value;
+        NORMAL_PHASE_2_QUOTA = Config.Bind(
+            "Normal Combat Mode",
+            "Normal Combat Phase 2 HP",
+            700,
+            "Sets the Phase 2 transition hp in normal combat mode."
+        ).Value;
+        NORMAL_PHASE_3_QUOTA = Config.Bind(
+            "Normal Combat Mode",
+            "Normal Combat Phase 3 HP",
+            400,
+            "Sets the phase 3 transition hp in normal combat mode."
         ).Value;
     }
 }

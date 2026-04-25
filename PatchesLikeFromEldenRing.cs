@@ -13,13 +13,7 @@ public class PatchesLikeFromEldenRing
     private static void HealthManager_Hit(HealthManager __instance)
     {
         if (!AeternalEverwatcherPlugin.foundWatcher) return;
-        __instance.invincible = true;
-    }
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(HealthManager), nameof(HealthManager.Invincible))]
-    private static void HealthManager_Invincible(HealthManager __instance, HitInstance hitInstance)
-    {
-        if (!AeternalEverwatcherPlugin.foundWatcher) return;
+        __instance.invincible = !Settings.NORMAL_COMBAT;
         if (!StateData.parryableStates.Contains(AeternalEverwatcherPlugin.controlFsm.ActiveStateName)) return;
         if (!__instance.gameObject.transform.root.Find("Body Damager").TryGetComponent<DamageHero>(out var damager)) return;
         AeternalEverwatcherPlugin.Instance.StartCoroutine(damager.NailClash(0, "Nail Attack", AeternalEverwatcherPlugin.transform.position));
@@ -36,7 +30,6 @@ public class PatchesLikeFromEldenRing
             return false;
         }
         return true;
-        //todo: remove the thunk freeze
     }
     [HarmonyPostfix]
     [HarmonyPatch(typeof(DamageHero), nameof(DamageHero.NailClash))]
@@ -49,6 +42,7 @@ public class PatchesLikeFromEldenRing
         if (!GameManager.instance.TimeSlowed) GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
         AeternalEverwatcherPlugin.healthManager.SpriteFlash.flashArmoured();
         HeroController.instance.AddSilk(1, false);
+        if (Settings.NORMAL_COMBAT) return;
         if (AeternalEverwatcherPlugin.parryCounter < Settings.END_FIGHT_QUOTA || !AeternalEverwatcherPlugin.PHASE_2 || !AeternalEverwatcherPlugin.PHASE_3) return;
         AeternalEverwatcherPlugin.ResetFlags();
         AeternalEverwatcherPlugin.healthManager.TakeDamage(new HitInstance

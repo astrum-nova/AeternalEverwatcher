@@ -66,7 +66,9 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                     case "Control":
                         controlFsm = fsm;
                         healthManager = fsm.GetComponent<HealthManager>();
-                        healthManager.TookDamage += () => healthManager.HealToMax();
+                        if (!Settings.NORMAL_COMBAT) healthManager.TookDamage += () => healthManager.HealToMax();
+                        else healthManager.hp = Settings.NORMAL_HP;
+                        healthManager.recoil.enabled = false;
                         transform = fsm.gameObject.transform;
                         damageHeroComponent = transform.Find("Body Damager").GetComponent<DamageHero>();
                         transform.gameObject.GetComponentInChildren<tk2dSprite>().renderLayer = 200;
@@ -106,23 +108,29 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         eigongAirDashing = false;
         tookDamage = false;
     }
+    private static bool Phase2ConditionParryOnly() => parryCounter >= Settings.PHASE_2_QUOTA && !PHASE_2 && CustomBehaviour.groundWave && CustomBehaviour.pcrBurst && CustomBehaviour.sandburst && CustomBehaviour.sandburstSmall;
+    private static bool Phase2ConditionNormal() => healthManager.hp <= Settings.NORMAL_PHASE_2_QUOTA && !PHASE_2 && CustomBehaviour.groundWave && CustomBehaviour.pcrBurst && CustomBehaviour.sandburst && CustomBehaviour.sandburstSmall;
+    private static bool Phase3ConditionParryOnly() => parryCounter >= Settings.PHASE_3_QUOTA && !PHASE_3 && PHASE_2;
+    private static bool Phase3ConditionNormal() => healthManager.hp <= Settings.NORMAL_PHASE_3_QUOTA && !PHASE_3 && PHASE_2;
     private static bool PhaseCheck()
     {
         if (fiveSLash || eigongAirDashing || pcrSlamming || quadSlashing) return false;
-        if (parryCounter >= Settings.PHASE_2_QUOTA && !PHASE_2 && CustomBehaviour.groundWave && CustomBehaviour.pcrBurst && CustomBehaviour.sandburst && CustomBehaviour.sandburstSmall)
+        if (Settings.NORMAL_COMBAT ? Phase2ConditionNormal() : Phase2ConditionParryOnly())
         {
             parryCounter = Settings.PHASE_2_QUOTA;
             ResetFlags();
             PHASE_2 = true;
             controlFsm.SetState("Stun Start");
+            Pools.PrewarmTelegraps();
             return true;
         }
-        if (parryCounter < Settings.PHASE_3_QUOTA || PHASE_3 || !PHASE_2) return false;
+        if (Settings.NORMAL_COMBAT ? !Phase3ConditionNormal() : !Phase3ConditionParryOnly()) return false;
         parryCounter = Settings.PHASE_3_QUOTA;
         ResetFlags();
         PHASE_3 = true;
         controlFsm.SetState("Stun Start");
         return true;
+
     }
     private static void SetupWatcher()
     {
@@ -212,6 +220,10 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             if (PHASE_2 && !eigongAirDashing && !quadSlashing) Instance.StartCoroutine(CustomBehaviour.SpawnSkProjectile());
         });
         controlFsm.GetState("Switchup 2")!.AddLambdaMethod(_ => controlFsm.GetFirstActionOfType<SetVelocityByScale>("Slash Combo 9")!.speed = Helpers.GetPosDiffSpeed() * -0.5f);
+        controlFsm.GetState("Slash Combo 7")!.AddLambdaMethod(_ =>
+        {
+            if (didSlashCombo1) Instance.StartCoroutine(CustomBehaviour.SandTelegraph("slam"));
+        });
         controlFsm.GetState("Slash Combo 11")!.AddLambdaMethod(_ =>
         {
             if (CustomBehaviour.sandburstSmall == null)
@@ -257,6 +269,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         controlFsm.GetFirstActionOfType<Wait>("Dig Out Antic")!.time = 0.3f;
         controlFsm.GetFirstActionOfType<SetVelocityByScale>("Dig Out Uppercut")!.speed = 120;
         controlFsm.GetFirstActionOfType<FaceObjectV2>("Uppercut Antic")!.everyFrame = true;
+        controlFsm.GetState("Uppercut Antic Q")!.AddLambdaMethod(_ => { Instance.StartCoroutine(CustomBehaviour.SandTelegraph(pcrSlamming ? "ground" : "uppercut")); });
         controlFsm.GetState("Uppercut Antic")!.AddLambdaMethod(_ =>
         {
             if (!pcrSlamming && PhaseCheck()) return;
@@ -270,9 +283,10 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                 case 1:
                     controlFsm.SetState("Evade Antic");
                     break;
+                case 0 when !PHASE_3:
                 case 2:
                 case 3:
-                    if (PHASE_2) CustomBehaviour.CreateWave("sandTelegraph", new Vector3(transform.position.x - 15 * transform.localScale.x, CustomBehaviour.SANDBURST_DEFAULT_Y - 4, CustomBehaviour.sandTelegraph.transform.position.z), rotation:false);
+                    if (PHASE_2 && !pcrSlamming) Instance.StartCoroutine(CustomBehaviour.SandTelegraph("uppercut"));
                     break;
             }
         });

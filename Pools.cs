@@ -27,6 +27,10 @@ public static class Pools
     {
         for (var i = 0; i < 15; i++) AddToPool(spears, CustomBehaviour.khannUcSpearSetup);
     }
+    public static void PrewarmTelegraps()
+    {
+        for (var i = 0; i < 3; i++) AddToPool(sandTelegraphs, CustomBehaviour.sandTelegraph);
+    }
     private static GameObject GetPooledObject(List<GameObject> pool, GameObject setup)
     {
         GameObject clone = null!;
