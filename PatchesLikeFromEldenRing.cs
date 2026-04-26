@@ -42,21 +42,28 @@ public class PatchesLikeFromEldenRing
         if (!GameManager.instance.TimeSlowed) GameManager.instance.FreezeMoment(FreezeMomentTypes.NailClashEffect);
         AeternalEverwatcherPlugin.healthManager.SpriteFlash.flashArmoured();
         HeroController.instance.AddSilk(1, false);
-        if (Settings.NORMAL_COMBAT) return;
-        if (AeternalEverwatcherPlugin.parryCounter < Settings.END_FIGHT_QUOTA || !AeternalEverwatcherPlugin.PHASE_2 || !AeternalEverwatcherPlugin.PHASE_3) return;
-        AeternalEverwatcherPlugin.ResetFlags();
-        AeternalEverwatcherPlugin.healthManager.TakeDamage(new HitInstance
+        if (!Settings.NORMAL_COMBAT)
         {
-            Source = HeroController.instance.gameObject,
-            AttackType = AttackTypes.Spell,
-            DamageDealt = 3000,
-            Direction = 0,
-            Multiplier = 1f,
-            MagnitudeMultiplier = 1f,
-            IgnoreInvulnerable = true,
-            HitEffectsType = EnemyHitEffectsProfile.EffectsTypes.Full,
-            IsNailTag = true
-        });
+            if (AeternalEverwatcherPlugin.parryCounter < Settings.END_FIGHT_QUOTA || !AeternalEverwatcherPlugin.PHASE_2 || !AeternalEverwatcherPlugin.PHASE_3) return;
+            AeternalEverwatcherPlugin.ResetFlags();
+            AeternalEverwatcherPlugin.healthManager.TakeDamage(new HitInstance
+            {
+                Source = HeroController.instance.gameObject,
+                AttackType = AttackTypes.Spell,
+                DamageDealt = 3000,
+                Direction = 0,
+                Multiplier = 1f,
+                MagnitudeMultiplier = 1f,
+                IgnoreInvulnerable = true,
+                HitEffectsType = EnemyHitEffectsProfile.EffectsTypes.Full,
+                IsNailTag = true
+            });
+        }
+        else
+        {
+            var hpAfterSubtract = AeternalEverwatcherPlugin.healthManager.hp - PlayerData.instance.nailDamage / 3;
+            AeternalEverwatcherPlugin.healthManager.hp = hpAfterSubtract < 1 ? 1 : hpAfterSubtract;
+        }
     }
 }
 

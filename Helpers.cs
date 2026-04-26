@@ -20,7 +20,7 @@ public static class Helpers
         if (colliders == null || colliders.Length == 0) return;
         foreach (var col in colliders)
         {
-            int environmentLayer = LayerMask.NameToLayer("Terrain");
+            var environmentLayer = LayerMask.NameToLayer("Terrain");
             if (environmentLayer >= 0) Physics2D.IgnoreLayerCollision(projectile.layer, environmentLayer, true);
             col.isTrigger = true;
         }
@@ -39,11 +39,9 @@ public static class Helpers
         foreach (var stateName in new[] { "Wall End", "Floor?" })
         {
             var s = fsm.GetState(stateName);
-            if (s != null)
-            {
-                s.Transitions = [];
-                s.Actions = [];
-            }
+            if (s == null) continue;
+            s.Transitions = [];
+            s.Actions = [];
         }
     }
     public static void removeEventFromState(string stateName, string eventName)
@@ -77,7 +75,7 @@ public static class Helpers
                         break;
                     case "sand_burst front":
                         renderer.material.SetColor(Color1, new Color(Settings.SAND_EFFECTS_BRIGHTNESS * (name == "sandTelegraph" ? 1.8f : 2.2f), Settings.SAND_EFFECTS_BRIGHTNESS * (name == "sandTelegraph" ? 1.5f : 2.2f), Settings.SAND_EFFECTS_BRIGHTNESS * (name == "sandTelegraph" ? 1.5f : 2.2f), 0.3f));
-                        if (!Settings.BOSS_AND_PLAYER_ABOVE_SAND) renderer.sortingOrder = 2000;
+                        if (!Settings.BOSS_AND_PLAYER_ABOVE_SAND || name == "sandTelegraph") renderer.sortingOrder = 2000;
                         break;
                     default:
                         renderer.material.SetColor(Color1, new Color(Settings.SAND_EFFECTS_BRIGHTNESS * 2f, Settings.SAND_EFFECTS_BRIGHTNESS * 2f, Settings.SAND_EFFECTS_BRIGHTNESS * 2f, 1f));
@@ -103,10 +101,10 @@ public static class Helpers
             limitVelocity.dampen = 0.5f;
         }
     }
-    public static void GroundWaveSetup(GameObject wave)
+    private static void GroundWaveSetup(GameObject wave)
     {
         var damagerHitboxOriginal = wave.transform.FindRelativeTransformWithPath("damager", false).GetComponent<PolygonCollider2D>();
-        Vector2[] points = [ new(-10, 3), new(10, 3), new(-10, 0), new(10, 0) ];
+        Vector2[] points = [ new(-30, 3), new(30, 3), new(30, 0), new(-30, 0) ];
         damagerHitboxOriginal.SetPath(0, points);
         foreach (var pt in wave.GetComponentsInChildren<ParticleSystem>(true))
         {
@@ -168,7 +166,7 @@ public static class Helpers
         //? Boss aggro range, extended to the far left edges of the scene
         var battleRange = GameObject.Find("Battle Range");
         battleRange.transform.position = battleRange.transform.position with { x = 75.2f };
-        battleRange.transform.localScale = battleRange.transform.localScale with { x = 1.372f };
+        battleRange.transform.localScale = new Vector3(5, 25, 1);
         //? Room transition trigger, extended higher up
         var roomTrans = GameObject.Find("right1");
         roomTrans.transform.localScale = roomTrans.transform.localScale with { y = 10 };

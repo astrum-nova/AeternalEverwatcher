@@ -178,7 +178,11 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
         //* Neutral
         controlFsm.GetFirstActionOfType<Wait>("Init Idle")!.time = 0.3f;
         controlFsm.GetFirstActionOfType<Wait>("Idle")!.time = 0;
-        controlFsm.GetState("Very Far")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave()));
+        controlFsm.GetState("Very Far")!.AddLambdaMethod(_ =>
+        {
+            if (quadSlashing || pcrSlamming || eigongAirDashing || fiveSLash) return;
+            Instance.StartCoroutine(CustomBehaviour.SpawnGroundWave());
+        });
         controlFsm.GetFirstActionOfType<Wait>("Range Out Pause")!.time = 0;
         //* Slash Combo
         controlFsm.GetFirstActionOfType<FaceObjectV2>("Slash Combo Antic Q")!.everyFrame = true;
@@ -279,6 +283,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                     fiveSLash = true;
                     fiveSLashedOnce = false;
                     controlFsm.SetState("Slash Combo Antic Q");
+                    Instance.StartCoroutine(CustomBehaviour.Teleport(transform.position.x, transform.position.y));
                     break;
                 case 1:
                     controlFsm.SetState("Evade Antic");
@@ -303,7 +308,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
             controlFsm.SetState("Uppercut Launch");
         });
         controlFsm.GetState("Die")!.AddLambdaMethod(_ => Instance.StartCoroutine(CustomBehaviour.DesperationSpears()));
-        foreach (var fsmState in new List<FsmState>()
+        foreach (var fsmState in new List<FsmState>
                  {
                      controlFsm.GetState("Slash Combo 1")!,
                      controlFsm.GetState("Slash Combo 5")!,
@@ -314,7 +319,7 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                      controlFsm.GetState("Dig Out Uppercut")!,
                      controlFsm.GetState("Jump Slash Air")!,
                  }) fsmState.AddLambdaMethod(_ => damageHeroComponent.enabled = true);
-        foreach (var fsmState in new List<FsmState>()
+        foreach (var fsmState in new List<FsmState>
                  {
                      controlFsm.GetState("Slash Combo 4")!,
                      controlFsm.GetState("Slash Combo 8")!,
@@ -323,6 +328,11 @@ public partial class AeternalEverwatcherPlugin : BaseUnityPlugin
                      controlFsm.GetState("Jump Away Antic")!,
                      controlFsm.GetState("Jump Slash Antic")!,
                  }) fsmState.AddLambdaMethod(_ => damageHeroComponent.enabled = false);
+        if (Settings.NORMAL_COMBAT)
+        {
+            controlFsm.GetState("Stun Start")!.AddLambdaMethod(_ => healthManager.invincible = true);
+            controlFsm.GetState("Stun Recover")!.AddLambdaMethod(_ => healthManager.invincible = false);
+        }
         Helpers.removeEventFromState("Slash Combo Antic", "BLOCKED HIT");
         Helpers.removeEventFromState("Evade Antic", "BLOCKED HIT");
         Helpers.removeEventFromState("Jump Away Antic", "BLOCKED HIT");

@@ -88,12 +88,6 @@ public static class CustomBehaviour
         if (!AeternalEverwatcherPlugin.PHASE_3) AeternalEverwatcherPlugin.controlFsm.SetState("Dig In 1");
         else if (!AeternalEverwatcherPlugin.pcrSlamming)
         {
-            if (Helpers.CheckDamage()) 
-            {
-                AeternalEverwatcherPlugin.controlFsm.SetState("Dig In 1");
-                AeternalEverwatcherPlugin.controlFsm.GetFirstActionOfType<SetVelocity2d>("F Slash Antic")!.y = 0;
-                yield break;
-            }
             yield return _waitForSeconds0_2;
             if (HeroController.instance.transform.position.y < 11.5) HeroController.instance.TakeDamage(null, CollisionSide.top, 2, HazardType.NON_HAZARD);
             var xOffset = Random.Range(0, 2) == 0 ? -9 : 9;
@@ -101,24 +95,12 @@ public static class CustomBehaviour
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x + xOffset, HeroController.instance.transform.position.y, "F Slash Antic"));
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.3f));
             yield return _waitForSeconds0_5;
-            if (Helpers.CheckDamage()) 
-            {
-                AeternalEverwatcherPlugin.controlFsm.SetState("Dig In 1");
-                AeternalEverwatcherPlugin.controlFsm.GetFirstActionOfType<SetVelocity2d>("F Slash Antic")!.y = 0;
-                yield break;
-            }
             AeternalEverwatcherPlugin.controlFsm.GetFirstActionOfType<SetVelocity2d>("F Slash Antic")!.y = 0;
             if (HeroController.instance.transform.position.y < 11.5) HeroController.instance.TakeDamage(null, CollisionSide.top, 2, HazardType.NON_HAZARD);
             CreateWave("groundWave", new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation:false);
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Teleport(HeroController.instance.transform.position.x - xOffset, HeroController.instance.transform.position.y + 3, "F Slash Antic"));
             AeternalEverwatcherPlugin.Instance.StartCoroutine(Helpers.FinishStateEarly("FINISHED", 0.1f));
             yield return _waitForSeconds0_3;
-            if (Helpers.CheckDamage()) 
-            {
-                AeternalEverwatcherPlugin.controlFsm.SetState("Dig In 1");
-                AeternalEverwatcherPlugin.controlFsm.GetFirstActionOfType<SetVelocity2d>("F Slash Antic")!.y = 0;
-                yield break;
-            }
             if (HeroController.instance.transform.position.y < 11.5) HeroController.instance.TakeDamage(null, CollisionSide.top, 2, HazardType.NON_HAZARD);
             CreateWave("groundWave", new Vector3(HeroController.instance.transform.position.x, SANDBURST_DEFAULT_Y, sandburst.transform.position.z), delayToDestruction: 3, rotation:false);
             AeternalEverwatcherPlugin.controlFsm.GetFirstActionOfType<SetVelocity2d>("F Slash Antic")!.y = 30;
@@ -209,11 +191,25 @@ public static class CustomBehaviour
         AeternalEverwatcherPlugin.controlFsm.SetState("Jump Away Air");
         AeternalEverwatcherPlugin.pcrSlamming = false;
     }
+
+    private static IEnumerator QuadSlashSpears()
+    {
+        var spear1 = Pools.GetSpear();
+        spear1.transform.position = spear1.transform.position with { x = AeternalEverwatcherPlugin.transform.position.x - 18 * AeternalEverwatcherPlugin.transform.localScale.x };
+        spear1.transform.localScale = spear1.transform.localScale with { x = AeternalEverwatcherPlugin.transform.localScale.x * 2};
+        spear1.SetActive(true);
+        spear1.transform.GetChild(0).gameObject.SetActive(true);
+        yield return _waitForSeconds1;
+        spear1.SetActive(false);
+        spear1.transform.GetChild(0).gameObject.SetActive(false);
+        spear1.transform.localScale = khannUcSpearSetup.transform.localScale;
+    }
     public static IEnumerator QuadWindSlash()
     {
-        if (!AeternalEverwatcherPlugin.quadSlashing)
+        if (!AeternalEverwatcherPlugin.quadSlashing && !AeternalEverwatcherPlugin.eigongAirDashing)
         {
             AeternalEverwatcherPlugin.quadSlashing = true;
+            AeternalEverwatcherPlugin.Instance.StartCoroutine(QuadSlashSpears());
             AeternalEverwatcherPlugin.controlFsm.SetState("F Slash Antic");
             AeternalEverwatcherPlugin.controlFsm.Fsm.ManualUpdate = true;
             yield return _waitForSeconds0_375;
@@ -361,7 +357,6 @@ public static class CustomBehaviour
         left2.transform.GetChild(0).gameObject.SetActive(true);
         right2.transform.GetChild(0).gameObject.SetActive(true);
     }
-
     public static IEnumerator SandTelegraph(string type)
     {
         if (!Settings.SAND_WAVE_TELEGRAPH) yield break;
